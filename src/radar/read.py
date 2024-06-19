@@ -325,6 +325,7 @@ def _read_tarinfo(source, kind, verbose=0):
 def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo=None, want_tarinfo=False, verbose=0):
     fn_name = colorize("radar._read_tar()", "green")
     if kind is not None and isinstance(tarinfo, dict):
+        basename = os.path.basename(source)
         # This part is when symbols, kind, and tarinfo are provided
         with tarfile.open(source) as aid:
             sweep = None
@@ -341,7 +342,8 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
                         if single["kind"] is Kind.CF1 or single["kind"] is Kind.CF2:
                             sweep = single
                             # Short-term workaround: Bistatic data current does not contain sweepElevation or sweepAzimuth
-                            parts = re_3parts.search(info.name).groupdict()
+                            # parts = re_3parts.search(info.name).groupdict()
+                            parts = re_3parts.search(basename).groupdict()
                             if parts["scan"][0] == "E":
                                 sweep["sweepElevation"] = float(parts["scan"][1:])
                             elif parts["scan"][0] == "A":
@@ -392,23 +394,20 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
         return sweep
 
 
-def read(source, symbols=["Z", "V", "W", "D", "P", "R"], finite=False, u8=False, want_tarinfo=False, verbose=0):
+def read(source, kind=None, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, finite=False, u8=False, verbose=0):
     fn_name = colorize("radar.read()", "green")
     if verbose > 1:
         print(f"{fn_name} {source}")
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
-        if want_tarinfo:
-            logger.warn(f"Option want_tarinfo is not supported for .nc files")
         with Dataset(source, mode="r") as nc:
             data = _read_ncid(nc, symbols=symbols, verbose=verbose)
     elif ext in [".xz", ".txz", ".tgz", ".tar"]:
         data = _read_tar(
             source,
+            kind=kind,
             symbols=symbols,
-            kind=None,
-            tarinfo=None,
-            want_tarinfo=want_tarinfo,
+            tarinfo=tarinfo,
             verbose=verbose,
         )
     else:
