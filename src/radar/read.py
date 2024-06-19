@@ -221,7 +221,7 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         sweepTime = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
     variables = ncid.groups["sweep_0001"].variables
     sweepMode = variables["sweep_mode"][:]
-    fixedAngle = variables["fixed_angle"][:]
+    fixedAngle = float(variables["fixed_angle"][:])
     sweepElevation, sweepAzimuth = 0.0, 0.0
     if sweepMode == "azimuth_surveillance":
         sweepElevation = fixedAngle
