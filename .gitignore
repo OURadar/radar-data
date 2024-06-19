@@ -1,0 +1,12 @@
+.DS_Store
+._*
+*.o
+*.pyc
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+*.egg-info
+*.mp4
+*.csv
+*.png
+.ipynb_checkpoints

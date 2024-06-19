@@ -13,7 +13,7 @@ description = "Radar Data"
 readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = [
-    "Development Status :: 1 - Development",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -25,7 +25,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/boonleng/radar-data"
+Repository = "https://github.com/ouradar/radar-data"
 
 [tool.setuptools]
 include-package-data = true
