@@ -19,7 +19,6 @@ def get_nexrad_location(site):
             with open(nexrad_db) as fid:
                 nexrad = json.load(fid)
         else:
-            # url = "https://radarhub.arrc.ou.edu/static/maps/nexrad-locations.json"
             url = "https://raw.githubusercontent.com/ouradar/radar-data/master/blob/nexrad-locations.json"
             print(f"Retrieving {url} ...")
             response = urllib.request.urlopen(url)
