@@ -256,7 +256,7 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         "sweepAzimuth": sweepAzimuth,
         "prf": 1000.0,
         "waveform": "u",
-        "gatewidth": 250.0,
+        "gatewidth": 400.0,
         "elevations": elevations,
         "azimuths": azimuths,
         "ranges": ranges,
