@@ -35,10 +35,11 @@ re_yyyymmdd_hhmmss_f = re.compile(r"20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01]
 
 empty_sweep = {
     "kind": "U",
+    "txrx": "M",
     "symbol": "U",
+    "sweepTime": 1369071296.0,
     "longitude": -97.422413,
     "latitude": 35.25527,
-    "sweepTime": 1369071296.0,
     "sweepElevation": 0.5,
     "sweepAzimuth": 42.0,
     "gatewidth": 15.0,
@@ -146,7 +147,7 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     timeString = ncid.getncattr("time_coverage_start")
     if timeString.endswith("Z"):
         timeString = timeString[:-1]
-    sweepTime = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+    time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
     sweepElevation = 0.0
     sweepAzimuth = 0.0
     elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
@@ -190,9 +191,9 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
-        "longitude": longitude,
+        "time": time,
         "latitude": latitude,
-        "sweepTime": sweepTime,
+        "longitude": longitude,
         "sweepElevation": sweepElevation,
         "sweepAzimuth": sweepAzimuth,
         "prf": prf,
@@ -220,9 +221,9 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         timeString = timeString[:-1]
     if "." in timeString:
         logger.debug(f"CF2 timeString = {timeString}")
-        sweepTime = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
     else:
-        sweepTime = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
     variables = ncid.groups["sweep_0001"].variables
     sweepMode = variables["sweep_mode"][:]
     fixedAngle = float(variables["fixed_angle"][:])
@@ -253,11 +254,14 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     return {
         "kind": Kind.CF2,
         "txrx": TxRx.BISTATIC,
-        "longitude": longitude,
+        "time": time,
         "latitude": latitude,
-        "sweepTime": sweepTime,
+        "longitude": longitude,
         "sweepElevation": sweepElevation,
         "sweepAzimuth": sweepAzimuth,
+        "rxOffsetX": -14.4867,
+        "rxOffsetY": -16.8781,
+        "rxOffsetZ": -0.03878,
         "prf": 1000.0,
         "waveform": "u",
         "gatewidth": 400.0,
@@ -273,9 +277,8 @@ def _read_wds_from_nc(ncid):
     attrs = ncid.ncattrs()
     elevations = np.array(ncid.variables["Elevation"][:], dtype=np.float32)
     azimuths = np.array(ncid.variables["Azimuth"][:], dtype=np.float32)
-    ranges = ncid.getncattr("RangeToFirstGate") + np.arange(ncid.dimensions["Gate"].size, dtype=np.float32) * ncid.getncattr(
-        "GateSize"
-    )
+    r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
+    ranges = r0 + np.arange(nr, dtype=np.float32) * dr
     values = np.array(ncid.variables[name][:], dtype=np.float32)
     values[values < -90] = np.nan
     if name == "RhoHV":
@@ -295,9 +298,9 @@ def _read_wds_from_nc(ncid):
     return {
         "kind": Kind.WDS,
         "txrx": TxRx.MONOSTATIC,
-        "longitude": float(ncid.getncattr("Longitude")),
+        "time": ncid.getncattr("Time"),
         "latitude": float(ncid.getncattr("Latitude")),
-        "sweepTime": ncid.getncattr("Time"),
+        "longitude": float(ncid.getncattr("Longitude")),
         "sweepElevation": ncid.getncattr("Elevation"),
         "sweepAzimuth": ncid.getncattr("Azimuth"),
         "prf": float(round(ncid.getncattr("PRF-value") * 0.1) * 10.0),
@@ -346,7 +349,6 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
                         if single["kind"] is Kind.CF1 or single["kind"] is Kind.CF2:
                             sweep = single
                             # Short-term workaround: Bistatic data current does not contain sweepElevation or sweepAzimuth
-                            # parts = re_3parts.search(info.name).groupdict()
                             parts = re_3parts.search(basename).groupdict()
                             if parts["scan"][0] == "E":
                                 sweep["sweepElevation"] = float(parts["scan"][1:])
