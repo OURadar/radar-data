@@ -58,6 +58,11 @@ class Kind:
     WDS = "W"
 
 
+class TxRx:
+    BISTATIC = "B"
+    MONOSTATIC = "M"
+
+
 """
     value - Raw values
 """
@@ -180,12 +185,11 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     else:
         ranges = np.array(ncid.variables["range"][:2], dtype=float)
         gatewidth = ranges[1] - ranges[0]
-    # TODO: Will remove once frontend has been updated
     ranges = np.array(ncid.variables["range"][:], dtype=np.float32)
     ranges = np.array([ranges] * len(azimuths))
     return {
         "kind": Kind.CF1,
-        "grid": "polar",
+        "txrx": TxRx.MONOSTATIC,
         "longitude": longitude,
         "latitude": latitude,
         "sweepTime": sweepTime,
@@ -248,7 +252,7 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         products["R"] = variables["RHOHV"][:]
     return {
         "kind": Kind.CF2,
-        "grid": "bistatic",
+        "txrx": TxRx.BISTATIC,
         "longitude": longitude,
         "latitude": latitude,
         "sweepTime": sweepTime,
@@ -290,7 +294,7 @@ def _read_wds_from_nc(ncid):
         symbol = "U"
     return {
         "kind": Kind.WDS,
-        "grid": "polar",
+        "txrx": TxRx.MONOSTATIC,
         "longitude": float(ncid.getncattr("Longitude")),
         "latitude": float(ncid.getncattr("Latitude")),
         "sweepTime": ncid.getncattr("Time"),
