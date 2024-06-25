@@ -1,16 +1,21 @@
 import os
 import re
+import sys
 import logging
 import tarfile
 import datetime
 import numpy as np
+
+np.set_printoptions(precision=2, suppress=True, threshold=10)
 
 from netCDF4 import Dataset
 
 from .cosmetics import colorize
 from .nexrad import get_nexrad_location
 
-logger = logging.getLogger("frontend")
+__prog__ = os.path.basename(sys.argv[0])
+
+logger = logging.getLogger("radar-data" if len(__prog__) == 0 else os.path.splitext(__prog__)[0])
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -132,7 +137,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            print(f"WDSS-II {createdBy}")
+            logger.info(f"{funcName} Reading as WDSS-II created by {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
         logger.error(f"{funcName} Unidentified NetCDF format")
@@ -277,7 +282,10 @@ def _read_wds_from_nc(ncid):
     attrs = ncid.ncattrs()
     elevations = np.array(ncid.variables["Elevation"][:], dtype=np.float32)
     azimuths = np.array(ncid.variables["Azimuth"][:], dtype=np.float32)
-    r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
+    if "GateSize" in attrs:
+        r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
+    elif "GateWidth" in ncid.variables:
+        r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.variables["GateWidth"][:][0]
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
     values = np.array(ncid.variables[name][:], dtype=np.float32)
     values[values < -90] = np.nan
@@ -301,8 +309,8 @@ def _read_wds_from_nc(ncid):
         "time": ncid.getncattr("Time"),
         "latitude": float(ncid.getncattr("Latitude")),
         "longitude": float(ncid.getncattr("Longitude")),
-        "sweepElevation": ncid.getncattr("Elevation"),
-        "sweepAzimuth": ncid.getncattr("Azimuth"),
+        "sweepElevation": ncid.getncattr("Elevation") if "Elevations" in attrs else 0.0,
+        "sweepAzimuth": ncid.getncattr("Azimuth") if "Azimuths" in attrs else 0.0,
         "prf": float(round(ncid.getncattr("PRF-value") * 0.1) * 10.0),
         "waveform": ncid.getncattr("Waveform") if "Waveform" in attrs else "",
         "gatewidth": float(ncid.variables["GateWidth"][:][0]),
@@ -360,10 +368,11 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
                             else:
                                 sweep["products"] = {**sweep["products"], **single["products"]}
             return sweep
+    tarinfo = {}
+    sweep = None
+    # This part is when tarinfo is not provided
+    logger.info(f"{fn_name} source = {source}")
     try:
-        tarinfo = {}
-        sweep = None
-        # This part is when tarinfo is not provided
         with tarfile.open(source) as aid:
             members = aid.getmembers()
             if verbose > 1:
@@ -371,7 +380,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
             for member in members:
                 with aid.extractfile(member) as fid:
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
-                        single = _read_ncid(ncid, symbols=symbols)
+                        single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                     if single["kind"] is Kind.CF1 or single["kind"] is Kind.CF2:
                         parts = re_3parts.search(member.name).groupdict()
                         logger.debug(parts)
@@ -392,8 +401,19 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
                             sweep = single
                         else:
                             sweep["products"] = {**sweep["products"], **single["products"]}
-    except:
-        logger.error(f"Error opening archive {source}")
+            if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
+                basename = os.path.basename(source)
+                parts = re_3parts.search(source).groupdict()
+                if parts["scan"][0] == "E":
+                    sweep["sweepElevation"] = float(parts["scan"][1:])
+                elif parts["scan"][0] == "A":
+                    sweep["sweepAzimuth"] = float(parts["scan"][1:])
+    except tarfile.ReadError:
+        logger.error(f"Error: The archive {source} is not a valid tar file")
+    except tarfile.ExtractError:
+        logger.error(f"Error: An error occurred while extracting the archive {source}")
+    except Exception as e:
+        logger.error(f"Error: {e}")
     if want_tarinfo:
         return sweep, tarinfo
     else:
