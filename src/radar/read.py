@@ -400,10 +400,12 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
         return sweep
 
 
-def read(source, kind=None, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, finite=False, u8=False, verbose=0):
+def read(source, kind=None, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     fn_name = colorize("radar.read()", "green")
     if verbose > 1:
         print(f"{fn_name} {source}")
+    if symbols is None:
+        symbols = ["Z", "V", "W", "D", "P", "R"]
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
         with Dataset(source, mode="r") as nc:
@@ -414,6 +416,7 @@ def read(source, kind=None, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None
             kind=kind,
             symbols=symbols,
             tarinfo=tarinfo,
+            want_tarinfo=want_tarinfo,
             verbose=verbose,
         )
     else:
