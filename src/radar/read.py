@@ -338,11 +338,11 @@ def _read_tarinfo(source, kind, verbose=0):
         return tarinfo
 
 
-def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo=None, want_tarinfo=False, verbose=0):
+def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
     fn_name = colorize("radar._read_tar()", "green")
-    if kind is not None and isinstance(tarinfo, dict):
+    if isinstance(tarinfo, dict):
         basename = os.path.basename(source)
-        # This part is when symbols, kind, and tarinfo are provided
+        # This part is when symbols and tarinfo are provided
         with tarfile.open(source) as aid:
             sweep = None
             for key, quartet in tarinfo.items():
@@ -421,7 +421,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], kind=None, tarinfo
         return sweep
 
 
-def read(source, kind=None, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
+def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     fn_name = colorize("radar.read()", "green")
     if verbose > 1:
         print(f"{fn_name} {source}")
@@ -434,7 +434,6 @@ def read(source, kind=None, symbols=None, tarinfo=None, want_tarinfo=False, fini
     elif ext in [".xz", ".txz", ".tgz", ".tar"]:
         data = _read_tar(
             source,
-            kind=kind,
             symbols=symbols,
             tarinfo=tarinfo,
             want_tarinfo=want_tarinfo,
