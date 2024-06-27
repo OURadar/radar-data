@@ -323,98 +323,70 @@ def _read_wds_from_nc(ncid):
     }
 
 
-def _read_tarinfo(source, kind, verbose=0):
-    with tarfile.open(source) as aid:
-        members = aid.getmembers()
-        if verbose > 1:
-            logger.debug(f"members: {members}")
-        tarinfo = {}
-        for member in members:
-            if kind is Kind.CF1 or kind is Kind.CF2:
-                tarinfo["*"] = (member.name, member.size, member.offset, member.offset_data)
-            elif kind is Kind.WDS:
-                parts = re_4parts.search(member.name).groupdict()
-                tarinfo[parts["symbol"]] = (member.name, member.size, member.offset, member.offset_data)
-        return tarinfo
-
-
-def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
-    fn_name = colorize("radar._read_tar()", "green")
-    if isinstance(tarinfo, dict):
-        basename = os.path.basename(source)
-        # This part is when symbols and tarinfo are provided
-        with tarfile.open(source) as aid:
-            sweep = None
-            for key, quartet in tarinfo.items():
-                if key != "*" and key not in symbols:
-                    continue
-                info = tarfile.TarInfo(quartet[0])
-                info.size = quartet[1]
-                info.offset = quartet[2]
-                info.offset_data = quartet[3]
-                with aid.extractfile(info) as fid:
-                    with Dataset("memory", mode="r", memory=fid.read()) as ncid:
-                        single = _read_ncid(ncid, symbols=symbols)
-                        if single["kind"] is Kind.CF1 or single["kind"] is Kind.CF2:
-                            sweep = single
-                            # Short-term workaround: Bistatic data current does not contain sweepElevation or sweepAzimuth
-                            parts = re_3parts.search(basename).groupdict()
-                            if parts["scan"][0] == "E":
-                                sweep["sweepElevation"] = float(parts["scan"][1:])
-                            elif parts["scan"][0] == "A":
-                                sweep["sweepAzimuth"] = float(parts["scan"][1:])
-                        elif single["kind"] is Kind.WDS:
-                            if sweep is None:
-                                sweep = single
-                            else:
-                                sweep["products"] = {**sweep["products"], **single["products"]}
-            return sweep
+def _read_tarinfo(source, verbose=0):
     tarinfo = {}
-    sweep = None
-    # This part is when tarinfo is not provided
-    logger.info(f"{fn_name} source = {source}")
     try:
         with tarfile.open(source) as aid:
             members = aid.getmembers()
             if verbose > 1:
-                logger.debug(f"{fn_name}   members = {members}")
-            for member in members:
-                with aid.extractfile(member) as fid:
-                    with Dataset("memory", mode="r", memory=fid.read()) as ncid:
-                        single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
-                    if single["kind"] is Kind.CF1 or single["kind"] is Kind.CF2:
-                        parts = re_3parts.search(member.name).groupdict()
-                        logger.debug(parts)
-                        tarinfo["Z"] = (member.name, member.size, member.offset, member.offset_data)
-                        sweep = single
-                        if parts["scan"][0] == "E":
-                            sweep["sweepElevation"] = float(parts["scan"][1:])
-                        elif parts["scan"][0] == "A":
-                            sweep["sweepAzimuth"] = float(parts["scan"][1:])
-                    elif single["kind"] is Kind.WDS:
-                        parts = re_4parts.search(member.name).groupdict()
-                        logger.debug(parts)
-                        symbol = parts["symbol"]
-                        if symbol not in symbols:
-                            continue
-                        tarinfo[symbol] = (member.name, member.size, member.offset, member.offset_data)
-                        if sweep is None:
-                            sweep = single
-                        else:
-                            sweep["products"] = {**sweep["products"], **single["products"]}
-            if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
-                basename = os.path.basename(source)
-                parts = re_3parts.search(source).groupdict()
-                if parts["scan"][0] == "E":
-                    sweep["sweepElevation"] = float(parts["scan"][1:])
-                elif parts["scan"][0] == "A":
-                    sweep["sweepAzimuth"] = float(parts["scan"][1:])
+                logger.debug(f"members: {members}")
+            tarinfo = {}
+            if len(members) == 1:
+                member = members[0]
+                tarinfo["*"] = (member.name, member.size, member.offset, member.offset_data)
+            else:
+                for member in members:
+                    parts = re_4parts.search(member.name).groupdict()
+                tarinfo[parts["symbol"]] = (member.name, member.size, member.offset, member.offset_data)
     except tarfile.ReadError:
         logger.error(f"Error: The archive {source} is not a valid tar file")
     except tarfile.ExtractError:
         logger.error(f"Error: An error occurred while extracting the archive {source}")
     except Exception as e:
         logger.error(f"Error: {e}")
+    return tarinfo
+
+
+def _quartetToTarInfo(quartet):
+    info = tarfile.TarInfo(quartet[0])
+    info.size = quartet[1]
+    info.offset = quartet[2]
+    info.offset_data = quartet[3]
+    return info
+
+
+def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
+    method = colorize("radar._read_tar()", "green")
+    if tarinfo is None:
+        tarinfo = _read_tarinfo(source, verbose=verbose)
+    info = colorize("source", source)
+    logger.info(f"{method} {info}")
+    sweep = None
+    with tarfile.open(source) as aid:
+        if "*" in tarinfo:
+            info = _quartetToTarInfo(tarinfo["*"])
+            with aid.extractfile(info) as fid:
+                with Dataset("memory", mode="r", memory=fid.read()) as ncid:
+                    sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        else:
+            for symbol in symbols:
+                if symbol not in tarinfo:
+                    continue
+                info = _quartetToTarInfo(tarinfo[symbol])
+                with aid.extractfile(info) as fid:
+                    with Dataset("memory", mode="r", memory=fid.read()) as ncid:
+                        single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+                    if sweep is None:
+                        sweep = single
+                    else:
+                        sweep["products"] = {**sweep["products"], **single["products"]}
+    if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
+        basename = os.path.basename(source)
+        parts = re_3parts.search(basename).groupdict()
+        if parts["scan"][0] == "E":
+            sweep["sweepElevation"] = float(parts["scan"][1:])
+        elif parts["scan"][0] == "A":
+            sweep["sweepAzimuth"] = float(parts["scan"][1:])
     if want_tarinfo:
         return sweep, tarinfo
     else:
