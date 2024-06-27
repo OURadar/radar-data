@@ -5,6 +5,8 @@
 *.xcuserstate
 project.xcworkspace/
 xcuserdata/
+build/
+dist/
 *.egg-info
 *.mp4
 *.csv
