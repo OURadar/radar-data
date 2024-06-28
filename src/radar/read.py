@@ -363,7 +363,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     show = colorize(source, "yellow")
     if not tarinfo:
         logger.error(f"{myname} No tarinfo in {show}")
-        return None, None if want_tarinfo else None
+        return (None, tarinfo) if want_tarinfo else None
     logger.info(f"{myname} {show}")
     sweep = None
     with tarfile.open(source) as aid:
@@ -386,7 +386,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                         sweep["products"] = {**sweep["products"], **single["products"]}
     if sweep is None:
         logger.error(f"{myname} No sweep found in {source}")
-        return None, None if want_tarinfo else None
+        return (None, tarinfo) if want_tarinfo else None
     if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
         basename = os.path.basename(source)
         parts = re_3parts.search(basename).groupdict()
@@ -394,7 +394,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             sweep["sweepElevation"] = float(parts["scan"][1:])
         elif parts["scan"][0] == "A":
             sweep["sweepAzimuth"] = float(parts["scan"][1:])
-    return sweep, tarinfo if want_tarinfo else sweep
+    return (sweep, tarinfo) if want_tarinfo else sweep
 
 
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
