@@ -328,8 +328,9 @@ def _read_tarinfo(source, verbose=0):
     try:
         with tarfile.open(source) as aid:
             members = aid.getmembers()
+            members = [m for m in members if m.isfile() and not m.name.startswith(".")]
             if verbose > 1:
-                logger.debug(f"members: {members}")
+                logger.info(f"members: {members}")
             tarinfo = {}
             if len(members) == 1:
                 member = members[0]
@@ -356,11 +357,14 @@ def _quartetToTarInfo(quartet):
 
 
 def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
-    method = colorize("radar._read_tar()", "green")
+    myname = colorize("radar._read_tar()", "green")
     if tarinfo is None:
         tarinfo = _read_tarinfo(source, verbose=verbose)
-    info = colorize("source", source)
-    logger.info(f"{method} {info}")
+    show = colorize(source, "yellow")
+    if not tarinfo:
+        logger.error(f"{myname} No tarinfo in {show}")
+        return None, None if want_tarinfo else None
+    logger.info(f"{myname} {show}")
     sweep = None
     with tarfile.open(source) as aid:
         if "*" in tarinfo:
@@ -380,6 +384,9 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                         sweep = single
                     else:
                         sweep["products"] = {**sweep["products"], **single["products"]}
+    if sweep is None:
+        logger.error(f"{myname} No sweep found in {source}")
+        return None, None if want_tarinfo else None
     if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
         basename = os.path.basename(source)
         parts = re_3parts.search(basename).groupdict()
@@ -387,16 +394,13 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             sweep["sweepElevation"] = float(parts["scan"][1:])
         elif parts["scan"][0] == "A":
             sweep["sweepAzimuth"] = float(parts["scan"][1:])
-    if want_tarinfo:
-        return sweep, tarinfo
-    else:
-        return sweep
+    return sweep, tarinfo if want_tarinfo else sweep
 
 
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
-    fn_name = colorize("radar.read()", "green")
+    myname = colorize("radar.read()", "green")
     if verbose > 1:
-        print(f"{fn_name} {source}")
+        print(f"{myname} {source}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
     ext = os.path.splitext(source)[1]
@@ -412,9 +416,12 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
             verbose=verbose,
         )
     else:
-        logger.error(f"{fn_name} Unsupported file extension {ext}")
+        logger.error(f"{myname} Unsupported file extension {ext}")
         data = empty_sweep
         data["kind"] = Kind.UNK
+    if data is None:
+        logger.error(f"{myname} No data found in {source}")
+        return empty_sweep
     if u8:
         data["u8"] = {}
         for key, value in data["products"].items():
