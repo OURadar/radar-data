@@ -383,12 +383,11 @@ def read_tarinfo(source, verbose=0):
             tarinfo = {}
             if len(members) == 1:
                 m = members[0]
-                tarinfo["*"] = (m.name, m.size, m.offset, m.offset_data)
+                tarinfo["*"] = [m.name, m.size, m.offset, m.offset_data]
             else:
                 for m in members:
                     parts = re_4parts.search(os.path.basename(m.name)).groupdict()
-                    tarinfo[parts["symbol"]] = (m.name, m.size, m.offset, m.offset_data)
-            print(tarinfo)
+                    tarinfo[parts["symbol"]] = [m.name, m.size, m.offset, m.offset_data]
     except tarfile.ReadError:
         logger.error(f"Error: The archive {source} is not a valid tar file")
     except tarfile.ExtractError:
