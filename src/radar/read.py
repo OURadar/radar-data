@@ -10,7 +10,7 @@ np.set_printoptions(precision=2, suppress=True, threshold=10)
 
 from netCDF4 import Dataset
 
-from .cosmetics import colorize
+from .cosmetics import colorize, NumpyPrettyPrinter
 from .nexrad import get_nexrad_location
 
 __prog__ = os.path.basename(sys.argv[0])
@@ -56,6 +56,8 @@ empty_sweep = {
     "values": {"U": np.empty((0, 0), dtype=np.float32)},
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
+
+pp = NumpyPrettyPrinter(depth=3, sort_dicts=False)
 
 
 class Kind:
@@ -432,3 +434,7 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
         for key, value in data["products"].items():
             data["products"][key] = np.nan_to_num(value)
     return data
+
+
+def pprint(obj):
+    return pp.pprint(obj)

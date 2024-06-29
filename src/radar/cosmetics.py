@@ -2,6 +2,9 @@
 #   Created by Boonleng Cheong
 #
 
+import pprint
+import numpy as np
+
 colors = {
     "red": 196,
     "orange": 214,
@@ -69,3 +72,25 @@ def byte_string(payload):
 
         p = f"{payload[0:1]}"
         return p + payload_binary(payload[1:8]) + " ... " + payload_binary(payload[-3:])
+
+
+class NumpyPrettyPrinter(pprint.PrettyPrinter):
+    def format(self, obj, context, maxlevels, level):
+        if isinstance(obj, np.ndarray) and obj.ndim > 1:
+            return self.format_array(obj), True, False
+        return super().format(obj, context, maxlevels, level)
+
+    def format_array(self, array):
+        array_str = np.array2string(
+            array, separator=", ", precision=2, suppress_small=True, formatter={"float_kind": lambda x: f"{x:.2f}"}
+        )
+        indented_lines = self.indent_lines(array_str, str(array.dtype))
+        return indented_lines
+
+    def indent_lines(self, array_str, dtype_str):
+        lines = array_str.split("\n")
+        indented_lines = ["array(" + lines[0]]
+        for line in lines[1:]:
+            indented_lines.append(" " * 25 + line)
+        indented_lines[-1] = indented_lines[-1] + f", dtype={dtype_str})"
+        return "\n".join(indented_lines)
