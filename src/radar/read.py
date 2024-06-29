@@ -328,17 +328,18 @@ def _read_tarinfo(source, verbose=0):
     try:
         with tarfile.open(source) as aid:
             members = aid.getmembers()
-            members = [m for m in members if m.isfile() and not m.name.startswith(".")]
+            members = [m for m in members if m.isfile() and not os.path.basename(m.name).startswith(".")]
             if verbose > 1:
                 logger.info(f"members: {members}")
             tarinfo = {}
             if len(members) == 1:
-                member = members[0]
-                tarinfo["*"] = (member.name, member.size, member.offset, member.offset_data)
+                m = members[0]
+                tarinfo["*"] = (m.name, m.size, m.offset, m.offset_data)
             else:
-                for member in members:
-                    parts = re_4parts.search(member.name).groupdict()
-                tarinfo[parts["symbol"]] = (member.name, member.size, member.offset, member.offset_data)
+                for m in members:
+                    parts = re_4parts.search(os.path.basename(m.name)).groupdict()
+                    tarinfo[parts["symbol"]] = (m.name, m.size, m.offset, m.offset_data)
+            print(tarinfo)
     except tarfile.ReadError:
         logger.error(f"Error: The archive {source} is not a valid tar file")
     except tarfile.ExtractError:
@@ -362,7 +363,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         tarinfo = _read_tarinfo(source, verbose=verbose)
     show = colorize(source, "yellow")
     if not tarinfo:
-        logger.error(f"{myname} No tarinfo in {show}")
+        logger.error(f"{myname} Unable to retrieve tarinfo in {show}")
         return (None, tarinfo) if want_tarinfo else None
     logger.info(f"{myname} {show}")
     sweep = None
