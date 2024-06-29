@@ -11,11 +11,10 @@ np.set_printoptions(precision=2, suppress=True, threshold=10)
 from netCDF4 import Dataset
 
 from .cosmetics import colorize, NumpyPrettyPrinter
+from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-__prog__ = os.path.basename(sys.argv[0])
-
-logger = logging.getLogger("radar-data" if len(__prog__) == 0 else os.path.splitext(__prog__)[0])
+logger = logging.getLogger("radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -57,7 +56,7 @@ empty_sweep = {
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
 
-pp = NumpyPrettyPrinter(depth=3, sort_dicts=False)
+sweep_printer = NumpyPrettyPrinter(depth=2, sort_dicts=False)
 
 
 class Kind:
@@ -325,7 +324,7 @@ def _read_wds_from_nc(ncid):
     }
 
 
-def _quartetToTarInfo(quartet):
+def _quartet_to_tarinfo(quartet):
     info = tarfile.TarInfo(quartet[0])
     info.size = quartet[1]
     info.offset = quartet[2]
@@ -345,7 +344,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     sweep = None
     with tarfile.open(source) as aid:
         if "*" in tarinfo:
-            info = _quartetToTarInfo(tarinfo["*"])
+            info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
                 with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                     sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -353,7 +352,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             for symbol in symbols:
                 if symbol not in tarinfo:
                     continue
-                info = _quartetToTarInfo(tarinfo[symbol])
+                info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                         single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -437,4 +436,12 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
 
 
 def pprint(obj):
-    return pp.pprint(obj)
+    return sweep_printer.pprint(obj)
+
+
+def initLogger():
+    global logger
+    prog = os.path.basename(sys.argv[0])
+    logger = Logger("radar-data" if len(prog) == 0 else os.path.splitext(prog)[0])
+    print(logger)
+    return logger

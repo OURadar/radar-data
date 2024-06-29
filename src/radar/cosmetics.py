@@ -82,7 +82,7 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
 
     def format_array(self, array):
         array_str = np.array2string(
-            array, separator=", ", precision=2, suppress_small=True, formatter={"float_kind": lambda x: f"{x:.2f}"}
+            array, separator=", ", precision=2, suppress_small=True, formatter={"float_kind": lambda x: f"{x:5.1f}"}
         )
         indented_lines = self.indent_lines(array_str, str(array.dtype))
         return indented_lines
