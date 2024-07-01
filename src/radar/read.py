@@ -194,7 +194,6 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         ranges = np.array(ncid.variables["range"][:2], dtype=float)
         gatewidth = ranges[1] - ranges[0]
     ranges = np.array(ncid.variables["range"][:], dtype=np.float32)
-    ranges = np.array([ranges] * len(azimuths))
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
