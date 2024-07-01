@@ -75,12 +75,16 @@ def byte_string(payload):
 
 
 class NumpyPrettyPrinter(pprint.PrettyPrinter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._current_indent = 0
+
     def format(self, obj, context, maxlevels, level):
         if isinstance(obj, np.ndarray) and obj.ndim > 1:
-            return self.format_array(obj), True, False
+            return self.format_2d_array(obj), True, False
         return super().format(obj, context, maxlevels, level)
 
-    def format_array(self, array):
+    def format_2d_array(self, array):
         array_str = np.array2string(
             array, separator=", ", precision=2, suppress_small=True, formatter={"float_kind": lambda x: f"{x:5.1f}"}
         )
@@ -89,8 +93,23 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
 
     def indent_lines(self, array_str, dtype_str):
         lines = array_str.split("\n")
-        indented_lines = ["array(" + lines[0]]
+        indented_lines = ["array_2d(" + lines[0]]
         for line in lines[1:]:
-            indented_lines.append(" " * 25 + line)
+            indented_lines.append(" " * (self._current_indent + 9) + line)
         indented_lines[-1] = indented_lines[-1] + f", dtype={dtype_str})"
         return "\n".join(indented_lines)
+
+    def _format_dict_items(self, items, stream, indent, allowance, context, level):
+        write = stream.write
+        indent += self._indent_per_level
+        delimnl = ",\n" + " " * indent
+        last_index = len(items) - 1
+        for i, (key, ent) in enumerate(items):
+            self._current_indent = indent + len(repr(key)) + 2
+            if isinstance(ent, np.ndarray) and ent.ndim > 1:
+                write(f"{repr(key)}: {self.format_2d_array(ent)}")
+            else:
+                write(f"{repr(key)}: ")
+                self._format(ent, stream, indent + len(repr(key)) + 2, allowance if i == last_index else 1, context, level)
+            if i != last_index:
+                write(delimnl)
