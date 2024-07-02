@@ -58,6 +58,8 @@ empty_sweep = {
 
 sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
 
+sep = colorize("/", "orange")
+
 
 class Kind:
     UNK = "U"
@@ -121,7 +123,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
         if verbose > 1:
-            print(f"{myname} {version} / {conventions} / {subConventions}")
+            print(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -133,12 +135,13 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
             return _read_cf2_from_nc(ncid, symbols=symbols)
         elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        raise ValueError(f"{myname} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
+        show = f"{myname} {version} {sep} {conventions} {sep} {subConventions}"
+        raise ValueError(f"{myname} Unsupported format {show}")
     # WDSS-II format contains "TypeName" and "DataType"
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            print(f"{myname} WDSS-II / {createdBy}")
+            print(f"{myname} WDSS-II {sep} {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
