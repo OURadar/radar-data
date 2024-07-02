@@ -85,18 +85,44 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
         return super().format(obj, context, maxlevels, level)
 
     def format_2d_array(self, array):
-        array_str = np.array2string(
-            array, separator=", ", precision=2, suppress_small=True, formatter={"float_kind": lambda x: f"{x:5.1f}"}
-        )
-        indented_lines = self.indent_lines(array_str, str(array.dtype))
+        if isinstance(array, np.ma.MaskedArray):
+            data_str = np.array2string(
+                array.data,
+                separator=", ",
+                suppress_small=True,
+                formatter={"float_kind": lambda x: "   ---" if x == array.fill_value else f"{x:6.2f}"},
+            )
+            mask_str = np.array2string(
+                array.mask,
+                separator=", ",
+                formatter={"bool_kind": lambda x: x},
+            )
+            prefix = "array_2d("
+            subprefix = prefix + "data="
+            indented_lines = self.indent_lines(data_str, subprefix)
+            indented_lines += "\n"
+            indented_lines += " " * self._current_indent
+            subprefix = " " * len(prefix) + "mask="
+            indented_lines += self.indent_lines(mask_str, subprefix, array.data.dtype, array.fill_value)
+        else:
+            array_str = np.array2string(array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:5.1f}"})
+            indented_lines = self.indent_lines(array_str, "array_2d(", array.dtype, array.fill_value)
         return indented_lines
 
-    def indent_lines(self, array_str, dtype_str):
+    def indent_lines(self, array_str, prefix, dtype=None, fill_value=None):
         lines = array_str.split("\n")
-        indented_lines = ["array_2d(" + lines[0]]
+        indented_lines = [prefix + lines[0]]
+        indent = " " * (self._current_indent + len(prefix))
         for line in lines[1:]:
-            indented_lines.append(" " * (self._current_indent + 9) + line)
-        indented_lines[-1] = indented_lines[-1] + f", dtype={dtype_str})"
+            indented_lines.append(indent + line)
+        # indented_lines[-1] = indented_lines[-1] + f", dtype={dtype_str})" if dtype_str else ""
+        indent = indent[:-5]
+        if fill_value:
+            indented_lines[-1] += ","
+            indented_lines.append(f"{indent}fill_value={str(fill_value)}")
+        if dtype:
+            indented_lines[-1] += ","
+            indented_lines.append(f"{indent}dtype={str(dtype)}")
         return "\n".join(indented_lines)
 
     def _format_dict_items(self, items, stream, indent, allowance, context, level):

@@ -47,7 +47,7 @@ class Logger(logging.Logger):
         handler.setLevel(logging.DEBUG)
         self.streamHandler = handler
         self.addHandler(handler)
-        self.setLevel(logging.INFO)
+        self.setLevel(logging.WARNING)
         self.refresh()
         self.init = True
         # print(f'self.level = {self.level}')
