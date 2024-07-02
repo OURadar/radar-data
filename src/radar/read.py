@@ -56,7 +56,7 @@ empty_sweep = {
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
 
-sweep_printer = NumpyPrettyPrinter(depth=2, sort_dicts=False)
+sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
 
 
 class Kind:

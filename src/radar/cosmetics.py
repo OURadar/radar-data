@@ -132,10 +132,17 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
         delimnl = ",\n" + " " * indent
         last_index = len(items) - 1
         for i, (key, ent) in enumerate(items):
-            self._current_indent = indent + len(repr(key)) + 2
             if isinstance(ent, np.ndarray) and ent.ndim > 1:
+                indent = level * self._indent_per_level
+                self._current_indent = indent + len(repr(key)) + 2
+                if i == 0:
+                    write("\n" + " " * indent)
+                delimnl = ",\n" + " " * indent
                 write(f"{repr(key)}: {self.format_2d_array(ent)}")
+                if i == last_index:
+                    write("\n" + " " * indent)
             else:
+                self._current_indent = indent + len(repr(key)) + 2
                 write(f"{repr(key)}: ")
                 self._format(ent, stream, indent + len(repr(key)) + 2, allowance if i == last_index else 1, context, level)
             if i != last_index:
