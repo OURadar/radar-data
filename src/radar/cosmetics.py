@@ -92,11 +92,14 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 suppress_small=True,
                 formatter={"float_kind": lambda x: " -----" if x == array.fill_value else f"{x:6.2f}"},
             )
-            mask_str = np.array2string(
-                array.mask,
-                separator=", ",
-                formatter={"bool": lambda x: "  True" if x else " False"},
-            )
+            if isinstance(array.mask, np.ndarray):
+                mask_str = np.array2string(
+                    array.mask,
+                    separator=", ",
+                    formatter={"bool": lambda x: "  True" if x else " False"},
+                )
+            else:
+                mask_str = repr(array.mask)
             prefix = "array_2d("
             indented_lines = self.indent_lines(data_str, prefix + "data=")
             indented_lines += ",\n" + " " * self._current_indent

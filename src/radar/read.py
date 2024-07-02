@@ -111,31 +111,29 @@ def starts_with_cf(string):
 
 
 def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
-    funcName = colorize("_read_ncid()", "green")
+    myname = colorize("radar._read_ncid()", "green")
     attrs = ncid.ncattrs()
     if verbose > 2:
         print(attrs)
     # CF-Radial format contains "Conventions" and "version"
     if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
-        if verbose > 1:
-            print(f"{conventions}")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
         if verbose > 1:
-            print(f"Sub_conventions = {subConventions}   version = {version}")
+            print(f"{myname} {version}   {conventions} / {subConventions}")
         m = re_cf_version.match(version)
-        if m and subConventions and starts_with_cf(subConventions):
+        if m:
             m = m.groupdict()
-            version = m["version"]
-            if version >= "2.0":
+            versionNumber = m["version"]
+            if versionNumber >= "2.0":
                 return _read_cf2_from_nc(ncid, symbols=symbols)
             return _read_cf1_from_nc(ncid, symbols=symbols)
         elif version[0] == "2":
             return _read_cf2_from_nc(ncid, symbols=symbols)
         elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        logger.error(f"{funcName} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
+        logger.error(f"{myname} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
         sweep = empty_sweep
         sweep["kind"] = Kind.UNK
         return sweep
@@ -143,10 +141,10 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.info(f"{funcName} Reading as WDSS-II created by {createdBy}")
+            logger.info(f"{myname} Reading as WDSS-II created by {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
-        logger.error(f"{funcName} Unidentified NetCDF format")
+        logger.error(f"{myname} Unidentified NetCDF format")
         sweep = empty_sweep
         sweep["kind"] = Kind.UNK
         return sweep
@@ -383,8 +381,8 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if parts is None:
         parts = re_3parts.search(basename)
         if parts is None:
-            logger.error(f"{myname} Unable to extract parts from {source}")
-            return empty_sweep
+            with Dataset(source, mode="r") as ncid:
+                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     parts = parts.groupdict()
     if verbose > 1:
         print(f"{myname} parts = {parts}")
@@ -450,7 +448,8 @@ def read_tarinfo(source, verbose=0):
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     myname = colorize("radar.read()", "green")
     if verbose:
-        print(f"{myname} {source}")
+        show = colorize(source, "yellow")
+        print(f"{myname} {show}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
     ext = os.path.splitext(source)[1]
