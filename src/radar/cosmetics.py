@@ -105,7 +105,7 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
             subprefix = " " * len(prefix) + "mask="
             indented_lines += self.indent_lines(mask_str, subprefix, array.data.dtype, array.fill_value)
         else:
-            array_str = np.array2string(array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:5.1f}"})
+            array_str = np.array2string(array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:6.2f}"})
             indented_lines = self.indent_lines(array_str, "array_2d(", array.dtype)
         return indented_lines
 
