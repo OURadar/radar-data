@@ -121,7 +121,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
         if verbose > 1:
-            print(f"{myname} {version}   {conventions} / {subConventions}")
+            print(f"{myname} {version} / {conventions} / {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -133,21 +133,15 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
             return _read_cf2_from_nc(ncid, symbols=symbols)
         elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        logger.error(f"{myname} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
-        sweep = empty_sweep
-        sweep["kind"] = Kind.UNK
-        return sweep
+        raise ValueError(f"{myname} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
     # WDSS-II format contains "TypeName" and "DataType"
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.info(f"{myname} Reading as WDSS-II created by {createdBy}")
+            print(f"{myname} WDSS-II / {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
-        logger.error(f"{myname} Unidentified NetCDF format")
-        sweep = empty_sweep
-        sweep["kind"] = Kind.UNK
-        return sweep
+        raise ValueError(f"{myname} Unidentified NetCDF format")
 
 
 def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
@@ -355,6 +349,9 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                     continue
                 info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
+                    if verbose > 1:
+                        show = colorize(info.name, "yellow")
+                        print(f"{myname} {show}", end="   ")
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                         single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                     if sweep is None:
@@ -401,18 +398,20 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         files.append(path)
     if not known:
         if verbose > 1:
-            print(f"{myname} {source}")
+            show = colorize(source, "yellow")
+            print(f"{myname} {show}", end="   ")
         with Dataset(source, mode="r") as ncid:
             return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     sweep = None
     for file in files:
         if verbose > 1:
-            print(f"{myname} {file}")
+            show = colorize(os.path.basename(file), "yellow")
+            print(f"{myname} {show}", end="   ")
         with Dataset(file, mode="r") as ncid:
             single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         if single is None:
-            logger.error(f"{myname} No data found in {file}")
-            return empty_sweep
+            logger.error(f"{myname} Unexpected {file}")
+            return None
         if sweep is None:
             sweep = single
         else:
@@ -452,6 +451,8 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
         print(f"{myname} {show}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
+    if not os.path.exists(source):
+        raise FileNotFoundError(f"{myname} {source} not found")
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
@@ -464,12 +465,9 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
             verbose=verbose,
         )
     else:
-        logger.error(f"{myname} Unsupported file extension {ext}")
-        data = empty_sweep
-        data["kind"] = Kind.UNK
+        raise ValueError(f"{myname} Unsupported file extension {ext}")
     if data is None:
-        logger.error(f"{myname} No data found in {source}")
-        return empty_sweep
+        raise ValueError(f"{myname} No data found in {source}")
     if u8:
         data["u8"] = {}
         for key, value in data["products"].items():
