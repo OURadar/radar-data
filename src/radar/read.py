@@ -10,12 +10,11 @@ np.set_printoptions(precision=2, suppress=True, threshold=10)
 
 from netCDF4 import Dataset
 
-from .cosmetics import colorize
+from .cosmetics import colorize, NumpyPrettyPrinter
+from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-__prog__ = os.path.basename(sys.argv[0])
-
-logger = logging.getLogger("radar-data" if len(__prog__) == 0 else os.path.splitext(__prog__)[0])
+logger = logging.getLogger("radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -56,6 +55,8 @@ empty_sweep = {
     "values": {"U": np.empty((0, 0), dtype=np.float32)},
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
+
+sweep_printer = NumpyPrettyPrinter(depth=2, sort_dicts=False)
 
 
 class Kind:
@@ -112,23 +113,27 @@ def starts_with_cf(string):
 def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     funcName = colorize("_read_ncid()", "green")
     attrs = ncid.ncattrs()
-    if verbose > 1:
+    if verbose > 2:
         print(attrs)
     # CF-Radial format contains "Conventions" and "version"
     if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
+        conventions = ncid.getncattr("Conventions")
         if verbose > 1:
-            conventions = ncid.getncattr("Conventions")
             print(f"{conventions}")
-        if "Sub_conventions" in attrs and "version" in attrs:
-            subConventions = ncid.getncattr("Sub_conventions")
-            version = ncid.getncattr("version")
-            logger.debug(f"Found Sub_conventions = {subConventions}   version = {version}")
-            m = re_cf_version.match(version)
-            if starts_with_cf(subConventions) and m:
-                m = m.groupdict()
-                version = m["version"]
-                if version >= "2.0":
-                    return _read_cf2_from_nc(ncid, symbols=symbols)
+        subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
+        version = ncid.getncattr("version") if "version" in attrs else None
+        if verbose > 1:
+            print(f"Sub_conventions = {subConventions}   version = {version}")
+        m = re_cf_version.match(version)
+        if m and subConventions and starts_with_cf(subConventions):
+            m = m.groupdict()
+            version = m["version"]
+            if version >= "2.0":
+                return _read_cf2_from_nc(ncid, symbols=symbols)
+            return _read_cf1_from_nc(ncid, symbols=symbols)
+        elif version[0] == "2":
+            return _read_cf2_from_nc(ncid, symbols=symbols)
+        elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
         logger.error(f"{funcName} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
         sweep = empty_sweep
@@ -193,7 +198,6 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         ranges = np.array(ncid.variables["range"][:2], dtype=float)
         gatewidth = ranges[1] - ranges[0]
     ranges = np.array(ncid.variables["range"][:], dtype=np.float32)
-    ranges = np.array([ranges] * len(azimuths))
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
@@ -323,7 +327,7 @@ def _read_wds_from_nc(ncid):
     }
 
 
-def _quartetToTarInfo(quartet):
+def _quartet_to_tarinfo(quartet):
     info = tarfile.TarInfo(quartet[0])
     info.size = quartet[1]
     info.offset = quartet[2]
@@ -343,7 +347,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     sweep = None
     with tarfile.open(source) as aid:
         if "*" in tarinfo:
-            info = _quartetToTarInfo(tarinfo["*"])
+            info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
                 with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                     sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -351,7 +355,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             for symbol in symbols:
                 if symbol not in tarinfo:
                     continue
-                info = _quartetToTarInfo(tarinfo[symbol])
+                info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                         single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -372,13 +376,59 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     return (sweep, tarinfo) if want_tarinfo else sweep
 
 
+def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
+    myname = colorize("radar._read_nc()", "green")
+    basename = os.path.basename(source)
+    parts = re_4parts.search(basename)
+    if parts is None:
+        parts = re_3parts.search(basename)
+        if parts is None:
+            logger.error(f"{myname} Unable to extract parts from {source}")
+            return empty_sweep
+    parts = parts.groupdict()
+    if verbose > 1:
+        print(f"{myname} parts = {parts}")
+    if "symbol" not in parts:
+        with Dataset(source, mode="r") as ncid:
+            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+    folder = os.path.dirname(source)
+    known = True
+    files = []
+    for symbol in symbols:
+        basename = "-".join([parts["name"], parts["time"], parts["scan"], symbol]) + ".nc"
+        path = os.path.join(folder, basename)
+        if not os.path.exists(path):
+            known = False
+            break
+        files.append(path)
+    if not known:
+        if verbose > 1:
+            print(f"{myname} {source}")
+        with Dataset(source, mode="r") as ncid:
+            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+    sweep = None
+    for file in files:
+        if verbose > 1:
+            print(f"{myname} {file}")
+        with Dataset(file, mode="r") as ncid:
+            single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        if single is None:
+            logger.error(f"{myname} No data found in {file}")
+            return empty_sweep
+        if sweep is None:
+            sweep = single
+        else:
+            sweep["products"] = {**sweep["products"], **single["products"]}
+    return sweep
+
+
 def read_tarinfo(source, verbose=0):
     tarinfo = {}
     try:
         with tarfile.open(source) as aid:
             members = aid.getmembers()
             members = [m for m in members if m.isfile() and not os.path.basename(m.name).startswith(".")]
-            if verbose > 1:
+            if verbose:
                 logger.info(f"members: {members}")
             tarinfo = {}
             if len(members) == 1:
@@ -399,14 +449,13 @@ def read_tarinfo(source, verbose=0):
 
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     myname = colorize("radar.read()", "green")
-    if verbose > 1:
+    if verbose:
         print(f"{myname} {source}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
-        with Dataset(source, mode="r") as nc:
-            data = _read_ncid(nc, symbols=symbols, verbose=verbose)
+        data = _read_nc(source, symbols=symbols, verbose=verbose)
     elif ext in [".xz", ".txz", ".tgz", ".tar"]:
         data = _read_tar(
             source,
@@ -432,3 +481,15 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
         for key, value in data["products"].items():
             data["products"][key] = np.nan_to_num(value)
     return data
+
+
+def pprint(obj):
+    return sweep_printer.pprint(obj)
+
+
+def initLogger():
+    global logger
+    prog = os.path.basename(sys.argv[0])
+    logger = Logger("radar-data" if len(prog) == 0 else os.path.splitext(prog)[0])
+    print(logger)
+    return logger

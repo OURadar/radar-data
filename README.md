@@ -13,3 +13,12 @@ These formats are currently supported
 ```shell
 pip install radar-data
 ```
+
+## Example Usage
+
+```python
+import radar
+
+file = os.path.expanduser("~/Downloads/data/PX-20240529-150246-E4.0-Z.nc")
+sweep = radar.read(file)
+```
