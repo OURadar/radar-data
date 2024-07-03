@@ -116,7 +116,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     myname = colorize("radar._read_ncid()", "green")
     attrs = ncid.ncattrs()
     if verbose > 2:
-        print(attrs)
+        print(myname, attrs)
     # CF-Radial format contains "Conventions" and "version"
     if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
@@ -131,7 +131,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
             if versionNumber >= "2.0":
                 return _read_cf2_from_nc(ncid, symbols=symbols)
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        elif version[0] == "2":
+        elif version >= "2":
             return _read_cf2_from_nc(ncid, symbols=symbols)
         elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
@@ -150,15 +150,26 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
 def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     longitude = float(ncid.variables["longitude"][:])
     latitude = float(ncid.variables["latitude"][:])
-    timeString = ncid.getncattr("time_coverage_start")
-    if timeString.endswith("Z"):
+    attrs = ncid.ncattrs()
+    if "time_coverage_start" in attrs:
+        timeString = ncid.getncattr("time_coverage_start")
+    elif "time_coverage_start" in ncid.variables:
+        timeString = b"".join(ncid.variables["time_coverage_start"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
+    else:
+        raise ValueError("No time_coverage_start")
+    if timeString.endswith(r"Z"):
         timeString = timeString[:-1]
-    time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+    if len(timeString) == 19:
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+    elif len(timeString) > 19:
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
+    else:
+        raise ValueError(f"Unexpected timeString = {timeString}")
     sweepElevation = 0.0
     sweepAzimuth = 0.0
     elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(ncid.variables["azimuth"][:], dtype=np.float32)
-    mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8").rstrip()
+    mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
         sweepElevation = float(ncid.variables["fixed_angle"][:])
     elif mode == "rhi":
@@ -168,6 +179,8 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         products["Z"] = ncid.variables["DBZ"][:]
     if "V" in symbols and "VEL" in ncid.variables:
         products["V"] = ncid.variables["VEL"][:]
+    elif "V" in symbols and "VR" in ncid.variables:
+        products["V"] = ncid.variables["VR"][:]
     if "W" in symbols and "WIDTH" in ncid.variables:
         products["W"] = ncid.variables["WIDTH"][:]
     if "D" in symbols and "ZDR" in ncid.variables:
