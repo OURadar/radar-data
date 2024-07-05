@@ -90,20 +90,20 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 array.data,
                 separator=", ",
                 suppress_small=True,
-                formatter={"float_kind": lambda x: "   ---" if x == array.fill_value else f"{x:6.2f}"},
+                formatter={"float_kind": lambda x: " -----" if x == array.fill_value else f"{x:6.2f}"},
             )
-            mask_str = np.array2string(
-                array.mask,
-                separator=", ",
-                formatter={"bool_kind": lambda x: x},
-            )
+            if isinstance(array.mask, np.ndarray):
+                mask_str = np.array2string(
+                    array.mask,
+                    separator=", ",
+                    formatter={"bool": lambda x: "  True" if x else " False"},
+                )
+            else:
+                mask_str = repr(array.mask)
             prefix = "array_2d("
-            subprefix = prefix + "data="
-            indented_lines = self.indent_lines(data_str, subprefix)
-            indented_lines += ",\n"
-            indented_lines += " " * self._current_indent
-            subprefix = " " * len(prefix) + "mask="
-            indented_lines += self.indent_lines(mask_str, subprefix, array.data.dtype, array.fill_value)
+            indented_lines = self.indent_lines(data_str, prefix + "data=")
+            indented_lines += ",\n" + " " * self._current_indent
+            indented_lines += self.indent_lines(mask_str, " " * len(prefix) + "mask=", array.data.dtype, array.fill_value)
         else:
             array_str = np.array2string(array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:6.2f}"})
             indented_lines = self.indent_lines(array_str, "array_2d(", array.dtype)
@@ -132,10 +132,17 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
         delimnl = ",\n" + " " * indent
         last_index = len(items) - 1
         for i, (key, ent) in enumerate(items):
-            self._current_indent = indent + len(repr(key)) + 2
             if isinstance(ent, np.ndarray) and ent.ndim > 1:
+                indent = level * self._indent_per_level
+                self._current_indent = indent + len(repr(key)) + 2
+                if i == 0:
+                    write("\n" + " " * indent)
+                delimnl = ",\n" + " " * indent
                 write(f"{repr(key)}: {self.format_2d_array(ent)}")
+                if i == last_index:
+                    write("\n" + " " * indent)
             else:
+                self._current_indent = indent + len(repr(key)) + 2
                 write(f"{repr(key)}: ")
                 self._format(ent, stream, indent + len(repr(key)) + 2, allowance if i == last_index else 1, context, level)
             if i != last_index:

@@ -14,7 +14,10 @@ from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-logger = logging.getLogger("radar-data")
+__prog__ = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+__logger_name__ = __prog__ if __prog__ else "radar-data"
+print(f"radar.read() logger name {__logger_name__}")
+logger = logging.getLogger(__prog__ if __prog__ else "radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -45,8 +48,8 @@ empty_sweep = {
     "time": 1369071296.0,
     "latitude": 35.25527,
     "longitude": -97.422413,
-    "sweepElevation": 0.5,
-    "sweepAzimuth": 42.0,
+    "scanElevation": 0.5,
+    "scanAzimuth": 42.0,
     "gatewidth": 15.0,
     "waveform": "s0",
     "prf": 1000.0,
@@ -56,7 +59,9 @@ empty_sweep = {
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
 
-sweep_printer = NumpyPrettyPrinter(depth=2, sort_dicts=False)
+sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
+
+sep = colorize("/", "orange")
 
 
 class Kind:
@@ -111,68 +116,81 @@ def starts_with_cf(string):
 
 
 def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
-    funcName = colorize("_read_ncid()", "green")
+    myname = colorize("radar._read_ncid()", "green")
     attrs = ncid.ncattrs()
     if verbose > 2:
-        print(attrs)
+        logger.debug(attrs)
     # CF-Radial format contains "Conventions" and "version"
     if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
-        if verbose > 1:
-            print(f"{conventions}")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
         if verbose > 1:
-            print(f"Sub_conventions = {subConventions}   version = {version}")
+            logger.debug(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
-        if m and subConventions and starts_with_cf(subConventions):
+        if m:
             m = m.groupdict()
-            version = m["version"]
-            if version >= "2.0":
+            versionNumber = m["version"]
+            if versionNumber >= "2.0":
                 return _read_cf2_from_nc(ncid, symbols=symbols)
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        elif version[0] == "2":
+        elif version >= "2":
             return _read_cf2_from_nc(ncid, symbols=symbols)
         elif version[0] == "1":
             return _read_cf1_from_nc(ncid, symbols=symbols)
-        logger.error(f"{funcName} Unsupported CF-radial format {conventions} / {subConventions} / {version}")
-        sweep = empty_sweep
-        sweep["kind"] = Kind.UNK
-        return sweep
+        show = f"{myname} {version} {sep} {conventions} {sep} {subConventions}"
+        raise ValueError(f"{myname} Unsupported format {show}")
     # WDSS-II format contains "TypeName" and "DataType"
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.info(f"{funcName} Reading as WDSS-II created by {createdBy}")
+            logger.debug(f"{myname} WDSS-II {sep} {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
-        logger.error(f"{funcName} Unidentified NetCDF format")
-        sweep = empty_sweep
-        sweep["kind"] = Kind.UNK
-        return sweep
+        raise ValueError(f"{myname} Unidentified NetCDF format")
 
 
 def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
-    longitude = float(ncid.variables["longitude"][:])
-    latitude = float(ncid.variables["latitude"][:])
-    timeString = ncid.getncattr("time_coverage_start")
-    if timeString.endswith("Z"):
+    longitude = float(ncid.variables["longitude"][0])
+    latitude = float(ncid.variables["latitude"][0])
+    attrs = ncid.ncattrs()
+    print(attrs)
+    if "time_coverage_start" in attrs:
+        timeString = ncid.getncattr("time_coverage_start")
+    elif "time_coverage_start" in ncid.variables:
+        timeString = b"".join(ncid.variables["time_coverage_start"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
+    else:
+        raise ValueError("No time_coverage_start")
+    if timeString.endswith(r"Z"):
         timeString = timeString[:-1]
-    time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
-    sweepElevation = 0.0
-    sweepAzimuth = 0.0
+    if len(timeString) == 19:
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+    elif len(timeString) > 19:
+        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
+    else:
+        raise ValueError(f"Unexpected timeString = {timeString}")
+    if "sweep_number" in ncid.variables:
+        sweepNumber = ncid.variables["sweep_number"][:]
+        print(f"sweepNumber = {sweepNumber}")
+    scanElevation = 0.0
+    scanAzimuth = 0.0
     elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(ncid.variables["azimuth"][:], dtype=np.float32)
-    mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8").rstrip()
+    mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
-        sweepElevation = float(ncid.variables["fixed_angle"][:])
+        scanElevation = float(ncid.variables["fixed_angle"][:])
     elif mode == "rhi":
-        sweepAzimuth = float(ncid.variables["fixed_angle"][:])
+        scanAzimuth = float(ncid.variables["fixed_angle"][:])
     products = {}
-    if "Z" in symbols and "DBZ" in ncid.variables:
-        products["Z"] = ncid.variables["DBZ"][:]
+    if "Z" in symbols:
+        if "DBZ" in ncid.variables:
+            products["Z"] = ncid.variables["DBZ"][:]
+        elif "DBZHC" in ncid.variables:
+            products["Z"] = ncid.variables["DBZHC"][:]
     if "V" in symbols and "VEL" in ncid.variables:
         products["V"] = ncid.variables["VEL"][:]
+    elif "V" in symbols and "VR" in ncid.variables:
+        products["V"] = ncid.variables["VR"][:]
     if "W" in symbols and "WIDTH" in ncid.variables:
         products["W"] = ncid.variables["WIDTH"][:]
     if "D" in symbols and "ZDR" in ncid.variables:
@@ -204,8 +222,8 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         "time": time,
         "latitude": latitude,
         "longitude": longitude,
-        "sweepElevation": sweepElevation,
-        "sweepAzimuth": sweepAzimuth,
+        "scanElevation": scanElevation,
+        "scanAzimuth": scanAzimuth,
         "prf": prf,
         "waveform": waveform,
         "gatewidth": gatewidth,
@@ -237,11 +255,11 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     variables = ncid.groups["sweep_0001"].variables
     sweepMode = variables["sweep_mode"][:]
     fixedAngle = float(variables["fixed_angle"][:])
-    sweepElevation, sweepAzimuth = 0.0, 0.0
+    scanElevation, scanAzimuth = 0.0, 0.0
     if sweepMode == "azimuth_surveillance":
-        sweepElevation = fixedAngle
+        scanElevation = fixedAngle
     elif sweepMode == "rhi":
-        sweepAzimuth = fixedAngle
+        scanAzimuth = fixedAngle
     elevations = np.array(variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
     ranges = np.array(variables["range"][:], dtype=np.float32)
@@ -267,8 +285,8 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         "time": time,
         "latitude": latitude,
         "longitude": longitude,
-        "sweepElevation": sweepElevation,
-        "sweepAzimuth": sweepAzimuth,
+        "scanElevation": scanElevation,
+        "scanAzimuth": scanAzimuth,
         "rxOffsetX": -14.4867,
         "rxOffsetY": -16.8781,
         "rxOffsetZ": -0.03878,
@@ -314,8 +332,8 @@ def _read_wds_from_nc(ncid):
         "time": ncid.getncattr("Time"),
         "latitude": float(ncid.getncattr("Latitude")),
         "longitude": float(ncid.getncattr("Longitude")),
-        "sweepElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
-        "sweepAzimuth": ncid.getncattr("Azimuth") if "Azimuth" in attrs else 0.0,
+        "scanElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
+        "scanAzimuth": ncid.getncattr("Azimuth") if "Azimuth" in attrs else 0.0,
         "prf": float(round(ncid.getncattr("PRF-value") * 0.1) * 10.0),
         "waveform": ncid.getncattr("Waveform") if "Waveform" in attrs else "",
         "gatewidth": float(ncid.variables["GateWidth"][:][0]),
@@ -343,7 +361,8 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     if not tarinfo:
         logger.error(f"{myname} Unable to retrieve tarinfo in {show}")
         return (None, tarinfo) if want_tarinfo else None
-    logger.info(f"{myname} {show}")
+    elif verbose > 1:
+        logger.debug(f"{myname} {show}")
     sweep = None
     with tarfile.open(source) as aid:
         if "*" in tarinfo:
@@ -357,6 +376,9 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                     continue
                 info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
+                    if verbose > 1:
+                        show = colorize(info.name, "yellow")
+                        logger.debug(f"{myname} {show}", end="   ")
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                         single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                     if sweep is None:
@@ -366,13 +388,13 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     if sweep is None:
         logger.error(f"{myname} No sweep found in {source}")
         return (None, tarinfo) if want_tarinfo else None
-    if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
+    if sweep["scanElevation"] == 0.0 and sweep["scanAzimuth"] == 0.0:
         basename = os.path.basename(source)
         parts = re_3parts.search(basename).groupdict()
         if parts["scan"][0] == "E":
-            sweep["sweepElevation"] = float(parts["scan"][1:])
+            sweep["scanElevation"] = float(parts["scan"][1:])
         elif parts["scan"][0] == "A":
-            sweep["sweepAzimuth"] = float(parts["scan"][1:])
+            sweep["scanAzimuth"] = float(parts["scan"][1:])
     return (sweep, tarinfo) if want_tarinfo else sweep
 
 
@@ -383,11 +405,11 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if parts is None:
         parts = re_3parts.search(basename)
         if parts is None:
-            logger.error(f"{myname} Unable to extract parts from {source}")
-            return empty_sweep
+            with Dataset(source, mode="r") as ncid:
+                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     parts = parts.groupdict()
     if verbose > 1:
-        print(f"{myname} parts = {parts}")
+        logger.debug(f"{myname} parts = {parts}")
     if "symbol" not in parts:
         with Dataset(source, mode="r") as ncid:
             return _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -403,18 +425,19 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         files.append(path)
     if not known:
         if verbose > 1:
-            print(f"{myname} {source}")
+            logger.debug(f"{myname} {source}")
         with Dataset(source, mode="r") as ncid:
             return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     sweep = None
     for file in files:
         if verbose > 1:
-            print(f"{myname} {file}")
+            show = colorize(os.path.basename(file), "yellow")
+            logger.debug(f"{myname} {show}")
         with Dataset(file, mode="r") as ncid:
             single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         if single is None:
-            logger.error(f"{myname} No data found in {file}")
-            return empty_sweep
+            logger.error(f"{myname} Unexpected {file}")
+            return None
         if sweep is None:
             sweep = single
         else:
@@ -428,8 +451,8 @@ def read_tarinfo(source, verbose=0):
         with tarfile.open(source) as aid:
             members = aid.getmembers()
             members = [m for m in members if m.isfile() and not os.path.basename(m.name).startswith(".")]
-            if verbose:
-                logger.info(f"members: {members}")
+            if verbose > 1:
+                logger.debug(f"members: {members}")
             tarinfo = {}
             if len(members) == 1:
                 m = members[0]
@@ -450,9 +473,12 @@ def read_tarinfo(source, verbose=0):
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     myname = colorize("radar.read()", "green")
     if verbose:
-        print(f"{myname} {source}")
+        show = colorize(source, "yellow")
+        logger.info(f"{myname} {show}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
+    if not os.path.exists(source):
+        raise FileNotFoundError(f"{myname} {source} not found")
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
@@ -465,12 +491,9 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
             verbose=verbose,
         )
     else:
-        logger.error(f"{myname} Unsupported file extension {ext}")
-        data = empty_sweep
-        data["kind"] = Kind.UNK
+        raise ValueError(f"{myname} Unsupported file extension {ext}")
     if data is None:
-        logger.error(f"{myname} No data found in {source}")
-        return empty_sweep
+        raise ValueError(f"{myname} No data found in {source}")
     if u8:
         data["u8"] = {}
         for key, value in data["products"].items():
@@ -489,7 +512,10 @@ def pprint(obj):
 
 def initLogger():
     global logger
-    prog = os.path.basename(sys.argv[0])
-    logger = Logger("radar-data" if len(prog) == 0 else os.path.splitext(prog)[0])
-    print(logger)
+    prog = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    logger = Logger(prog if prog else "radar-data")
     return logger
+
+def setLogger(newLogger):
+    global logger
+    logger = newLogger
