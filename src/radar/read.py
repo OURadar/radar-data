@@ -14,7 +14,10 @@ from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-logger = logging.getLogger("radar-data")
+__prog__ = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+__logger_name__ = __prog__ if __prog__ else "radar-data"
+print(f"radar.read() logger name {__logger_name__}")
+logger = logging.getLogger(__prog__ if __prog__ else "radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -114,14 +117,14 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     myname = colorize("radar._read_ncid()", "green")
     attrs = ncid.ncattrs()
     if verbose > 2:
-        print(attrs)
+        logger.debug(attrs)
     # CF-Radial format contains "Conventions" and "version"
     if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
         if verbose > 1:
-            print(f"{myname} {version}   {conventions} / {subConventions}")
+            logger.info(f"{myname} {version}   {conventions} / {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -385,7 +388,7 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
                 return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     parts = parts.groupdict()
     if verbose > 1:
-        print(f"{myname} parts = {parts}")
+        logger.debug(f"{myname} parts = {parts}")
     if "symbol" not in parts:
         with Dataset(source, mode="r") as ncid:
             return _read_ncid(ncid, symbols=symbols, verbose=verbose)
@@ -401,13 +404,13 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         files.append(path)
     if not known:
         if verbose > 1:
-            print(f"{myname} {source}")
+            logger.debug(f"{myname} {source}")
         with Dataset(source, mode="r") as ncid:
             return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     sweep = None
     for file in files:
         if verbose > 1:
-            print(f"{myname} {file}")
+            logger.debug(f"{myname} {file}")
         with Dataset(file, mode="r") as ncid:
             single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         if single is None:
@@ -426,8 +429,8 @@ def read_tarinfo(source, verbose=0):
         with tarfile.open(source) as aid:
             members = aid.getmembers()
             members = [m for m in members if m.isfile() and not os.path.basename(m.name).startswith(".")]
-            if verbose:
-                logger.info(f"members: {members}")
+            if verbose > 1:
+                logger.debug(f"members: {members}")
             tarinfo = {}
             if len(members) == 1:
                 m = members[0]
@@ -449,7 +452,7 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
     myname = colorize("radar.read()", "green")
     if verbose:
         show = colorize(source, "yellow")
-        print(f"{myname} {show}")
+        logger.info(f"{myname} {show}")
     if symbols is None:
         symbols = ["Z", "V", "W", "D", "P", "R"]
     ext = os.path.splitext(source)[1]
@@ -488,7 +491,10 @@ def pprint(obj):
 
 def initLogger():
     global logger
-    prog = os.path.basename(sys.argv[0])
-    logger = Logger("radar-data" if len(prog) == 0 else os.path.splitext(prog)[0])
-    print(logger)
+    prog = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    logger = Logger(prog if prog else "radar-data")
     return logger
+
+def setLogger(newLogger):
+    global logger
+    logger = newLogger
