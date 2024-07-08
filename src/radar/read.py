@@ -14,10 +14,7 @@ from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-__prog__ = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-__logger_name__ = __prog__ if __prog__ else "radar-data"
-print(f"radar.read() logger name {__logger_name__}")
-logger = logging.getLogger(__prog__ if __prog__ else "radar-data")
+logger = None
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -125,8 +122,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
-        if verbose > 1:
-            logger.debug(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
+        logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -142,9 +138,9 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         raise ValueError(f"{myname} Unsupported format {show}")
     # WDSS-II format contains "TypeName" and "DataType"
     elif "TypeName" in attrs and "DataType" in attrs:
-        if verbose > 1:
+        if verbose:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.debug(f"{myname} WDSS-II {sep} {createdBy}")
+            logger.info(f"{myname} WDSS-II {sep} {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
@@ -154,7 +150,6 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     longitude = float(ncid.variables["longitude"][0])
     latitude = float(ncid.variables["latitude"][0])
     attrs = ncid.ncattrs()
-    print(attrs)
     if "time_coverage_start" in attrs:
         timeString = ncid.getncattr("time_coverage_start")
     elif "time_coverage_start" in ncid.variables:
@@ -169,9 +164,9 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
     else:
         raise ValueError(f"Unexpected timeString = {timeString}")
-    if "sweep_number" in ncid.variables:
-        sweepNumber = ncid.variables["sweep_number"][:]
-        print(f"sweepNumber = {sweepNumber}")
+    # if "sweep_number" in ncid.variables:
+    #     sweepNumber = ncid.variables["sweep_number"][:]
+    #     # print(f"sweepNumber = {sweepNumber}")
     sweepElevation = 0.0
     sweepAzimuth = 0.0
     elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
@@ -248,7 +243,8 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if timeString.endswith("Z"):
         timeString = timeString[:-1]
     if "." in timeString:
-        logger.debug(f"CF2 timeString = {timeString}")
+        myname = colorize("radar._read_cf2_from_nc()", "green")
+        logger.debug(f"{myname} CF2 timeString = {timeString}")
         time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
     else:
         time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
@@ -378,7 +374,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                 with aid.extractfile(info) as fid:
                     if verbose > 1:
                         show = colorize(info.name, "yellow")
-                        logger.debug(f"{myname} {show}", end="   ")
+                        logger.debug(f"{myname} {show}")
                     with Dataset("memory", mode="r", memory=fid.read()) as ncid:
                         single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                     if sweep is None:
@@ -452,7 +448,8 @@ def read_tarinfo(source, verbose=0):
             members = aid.getmembers()
             members = [m for m in members if m.isfile() and not os.path.basename(m.name).startswith(".")]
             if verbose > 1:
-                logger.debug(f"members: {members}")
+                myname = colorize("radar.read_tarinfo()", "green")
+                logger.debug(f"{myname} {members}")
             tarinfo = {}
             if len(members) == 1:
                 m = members[0]
@@ -473,6 +470,7 @@ def read_tarinfo(source, verbose=0):
 def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
     myname = colorize("radar.read()", "green")
     if verbose:
+        logger.setLevel(logging.DEBUG if verbose > 1 else logging.INFO)
         show = colorize(source, "yellow")
         logger.info(f"{myname} {show}")
     if symbols is None:
@@ -520,3 +518,8 @@ def initLogger():
 def setLogger(newLogger):
     global logger
     logger = newLogger
+
+
+##
+
+initLogger()
