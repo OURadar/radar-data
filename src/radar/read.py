@@ -48,8 +48,8 @@ empty_sweep = {
     "time": 1369071296.0,
     "latitude": 35.25527,
     "longitude": -97.422413,
-    "scanElevation": 0.5,
-    "scanAzimuth": 42.0,
+    "sweepElevation": 0.5,
+    "sweepAzimuth": 42.0,
     "gatewidth": 15.0,
     "waveform": "s0",
     "prf": 1000.0,
@@ -172,15 +172,15 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if "sweep_number" in ncid.variables:
         sweepNumber = ncid.variables["sweep_number"][:]
         print(f"sweepNumber = {sweepNumber}")
-    scanElevation = 0.0
-    scanAzimuth = 0.0
+    sweepElevation = 0.0
+    sweepAzimuth = 0.0
     elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(ncid.variables["azimuth"][:], dtype=np.float32)
     mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
-        scanElevation = float(ncid.variables["fixed_angle"][:])
+        sweepElevation = float(ncid.variables["fixed_angle"][:])
     elif mode == "rhi":
-        scanAzimuth = float(ncid.variables["fixed_angle"][:])
+        sweepAzimuth = float(ncid.variables["fixed_angle"][:])
     products = {}
     if "Z" in symbols:
         if "DBZ" in ncid.variables:
@@ -222,8 +222,8 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         "time": time,
         "latitude": latitude,
         "longitude": longitude,
-        "scanElevation": scanElevation,
-        "scanAzimuth": scanAzimuth,
+        "sweepElevation": sweepElevation,
+        "sweepAzimuth": sweepAzimuth,
         "prf": prf,
         "waveform": waveform,
         "gatewidth": gatewidth,
@@ -255,11 +255,11 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     variables = ncid.groups["sweep_0001"].variables
     sweepMode = variables["sweep_mode"][:]
     fixedAngle = float(variables["fixed_angle"][:])
-    scanElevation, scanAzimuth = 0.0, 0.0
+    sweepElevation, sweepAzimuth = 0.0, 0.0
     if sweepMode == "azimuth_surveillance":
-        scanElevation = fixedAngle
+        sweepElevation = fixedAngle
     elif sweepMode == "rhi":
-        scanAzimuth = fixedAngle
+        sweepAzimuth = fixedAngle
     elevations = np.array(variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
     ranges = np.array(variables["range"][:], dtype=np.float32)
@@ -285,8 +285,8 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         "time": time,
         "latitude": latitude,
         "longitude": longitude,
-        "scanElevation": scanElevation,
-        "scanAzimuth": scanAzimuth,
+        "sweepElevation": sweepElevation,
+        "sweepAzimuth": sweepAzimuth,
         "rxOffsetX": -14.4867,
         "rxOffsetY": -16.8781,
         "rxOffsetZ": -0.03878,
@@ -332,8 +332,8 @@ def _read_wds_from_nc(ncid):
         "time": ncid.getncattr("Time"),
         "latitude": float(ncid.getncattr("Latitude")),
         "longitude": float(ncid.getncattr("Longitude")),
-        "scanElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
-        "scanAzimuth": ncid.getncattr("Azimuth") if "Azimuth" in attrs else 0.0,
+        "sweepElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
+        "sweepAzimuth": ncid.getncattr("Azimuth") if "Azimuth" in attrs else 0.0,
         "prf": float(round(ncid.getncattr("PRF-value") * 0.1) * 10.0),
         "waveform": ncid.getncattr("Waveform") if "Waveform" in attrs else "",
         "gatewidth": float(ncid.variables["GateWidth"][:][0]),
@@ -388,13 +388,13 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     if sweep is None:
         logger.error(f"{myname} No sweep found in {source}")
         return (None, tarinfo) if want_tarinfo else None
-    if sweep["scanElevation"] == 0.0 and sweep["scanAzimuth"] == 0.0:
+    if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
         basename = os.path.basename(source)
         parts = re_3parts.search(basename).groupdict()
         if parts["scan"][0] == "E":
-            sweep["scanElevation"] = float(parts["scan"][1:])
+            sweep["sweepElevation"] = float(parts["scan"][1:])
         elif parts["scan"][0] == "A":
-            sweep["scanAzimuth"] = float(parts["scan"][1:])
+            sweep["sweepAzimuth"] = float(parts["scan"][1:])
     return (sweep, tarinfo) if want_tarinfo else sweep
 
 
@@ -515,6 +515,7 @@ def initLogger():
     prog = os.path.splitext(os.path.basename(sys.argv[0]))[0]
     logger = Logger(prog if prog else "radar-data")
     return logger
+
 
 def setLogger(newLogger):
     global logger
