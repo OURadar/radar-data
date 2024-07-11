@@ -325,7 +325,7 @@ def _read_wds_from_nc(ncid):
     return {
         "kind": Kind.WDS,
         "txrx": TxRx.MONOSTATIC,
-        "time": ncid.getncattr("Time"),
+        "time": int(ncid.getncattr("Time")),
         "latitude": float(ncid.getncattr("Latitude")),
         "longitude": float(ncid.getncattr("Longitude")),
         "sweepElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
