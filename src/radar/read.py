@@ -122,7 +122,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
-        logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
+        logger.debug(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -140,7 +140,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     elif "TypeName" in attrs and "DataType" in attrs:
         if verbose:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.info(f"{myname} WDSS-II {sep} {createdBy}")
+            logger.debug(f"{myname} WDSS-II {sep} {createdBy}")
         return _read_wds_from_nc(ncid)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
