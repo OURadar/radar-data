@@ -4,6 +4,7 @@ import sys
 import logging
 import tarfile
 import datetime
+import threading
 import numpy as np
 
 np.set_printoptions(precision=2, suppress=True, threshold=10)
@@ -59,6 +60,8 @@ empty_sweep = {
 sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
 
 sep = colorize("/", "orange")
+
+_lock = threading.Lock()
 
 
 class Kind:
@@ -122,7 +125,8 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
-        logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
+        if verbose:
+            logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -364,13 +368,9 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         if "*" in tarinfo:
             info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
-                with Dataset("memory", memory=fid.read()) as ncid:
-                    sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
-            # aid.extract(info, "/mnt/ramdisk")
-            # filename = os.path.join("/mnt/ramdisk", info.name)
-            # with Dataset(filename, mode="r") as ncid:
-            #     sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
-            # os.remove(filename)
+                with _lock:
+                    with Dataset("memory", memory=fid.read()) as ncid:
+                        sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
             for symbol in symbols:
                 if symbol not in tarinfo:
@@ -380,8 +380,10 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                     if verbose > 1:
                         show = colorize(info.name, "yellow")
                         logger.debug(f"{myname} {show}")
-                    with Dataset("memory", mode="r", memory=fid.read()) as ncid:
-                        single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+                    content = fid.read()
+                    with _lock:
+                        with Dataset("memory", mode="r", memory=content) as ncid:
+                            single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                     if sweep is None:
                         sweep = single
                     else:
@@ -406,14 +408,16 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if parts is None:
         parts = re_3parts.search(basename)
         if parts is None:
-            with Dataset(source, mode="r") as ncid:
-                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+            with _lock:
+                with Dataset(source, mode="r") as ncid:
+                    return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     parts = parts.groupdict()
     if verbose > 1:
         logger.debug(f"{myname} parts = {parts}")
     if "symbol" not in parts:
-        with Dataset(source, mode="r") as ncid:
-            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with _lock:
+            with Dataset(source, mode="r") as ncid:
+                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     folder = os.path.dirname(source)
     known = True
     files = []
@@ -427,15 +431,17 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if not known:
         if verbose > 1:
             logger.debug(f"{myname} {source}")
-        with Dataset(source, mode="r") as ncid:
-            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with _lock:
+            with Dataset(source, mode="r") as ncid:
+                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     sweep = None
     for file in files:
         if verbose > 1:
             show = colorize(os.path.basename(file), "yellow")
             logger.debug(f"{myname} {show}")
-        with Dataset(file, mode="r") as ncid:
-            single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with _lock:
+            with Dataset(file, mode="r") as ncid:
+                single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         if single is None:
             logger.error(f"{myname} Unexpected {file}")
             return None
@@ -485,6 +491,7 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
     ext = os.path.splitext(source)[1]
     if ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
+        tarinfo = {}
     elif ext in [".xz", ".txz", ".tgz", ".tar"]:
         output = _read_tar(
             source,
