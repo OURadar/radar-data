@@ -364,8 +364,13 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         if "*" in tarinfo:
             info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
-                with Dataset("memory", mode="r", memory=fid.read()) as ncid:
+                with Dataset("memory", memory=fid.read()) as ncid:
                     sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+            # aid.extract(info, "/mnt/ramdisk")
+            # filename = os.path.join("/mnt/ramdisk", info.name)
+            # with Dataset(filename, mode="r") as ncid:
+            #     sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+            # os.remove(filename)
         else:
             for symbol in symbols:
                 if symbol not in tarinfo:
@@ -481,13 +486,17 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
     if ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
     elif ext in [".xz", ".txz", ".tgz", ".tar"]:
-        data = _read_tar(
+        output = _read_tar(
             source,
             symbols=symbols,
             tarinfo=tarinfo,
             want_tarinfo=want_tarinfo,
             verbose=verbose,
         )
+        if want_tarinfo:
+            data, tarinfo = output
+        else:
+            data = output
     else:
         raise ValueError(f"{myname} Unsupported file extension {ext}")
     if data is None:
@@ -501,6 +510,8 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
     if finite:
         for key, value in data["products"].items():
             data["products"][key] = np.nan_to_num(value)
+    if want_tarinfo:
+        return data, tarinfo
     return data
 
 
