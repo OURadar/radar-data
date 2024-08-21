@@ -209,7 +209,7 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         if "waveform" in attrs:
             waveform = group.getncattr("waveform")
         if "prt" in attrs:
-            prf = round(group.getncattr("prf"), 1)
+            prf = round(float(group.getncattr("prf")), 1)
     if "meters_between_gates" in ncid.variables["range"]:
         gatewidth = float(ncid.variables["range"].getncattr("meters_between_gates"))
     else:
