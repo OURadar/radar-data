@@ -202,13 +202,14 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     waveform = "u"
     gatewidth = 100.0
     if "prt" in ncid.variables:
-        prf = float(round(1.0 / ncid.variables["prt"][:][0] * 10.0) * 0.1)
-    if "radarkit" in ncid.groups:
-        rk = ncid.groups["radarkit_parameters"].ncattrs()
-        if "waveform" in rk:
-            waveform = rk["waveform"]
-        if "prt" in ncid.variables:
-            prf = float(round(rk["prf"] * 10.0) * 0.1)
+        prf = round(1.0 / ncid.variables["prt"][:][0], 1)
+    if "radarkit_parameters" in ncid.groups:
+        group = ncid.groups["radarkit_parameters"]
+        attrs = group.ncattrs()
+        if "waveform" in attrs:
+            waveform = group.getncattr("waveform")
+        if "prt" in attrs:
+            prf = round(group.getncattr("prf"), 1)
     if "meters_between_gates" in ncid.variables["range"]:
         gatewidth = float(ncid.variables["range"].getncattr("meters_between_gates"))
     else:
