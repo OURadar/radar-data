@@ -369,9 +369,8 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         if "*" in tarinfo:
             info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
-                with _lock:
-                    with Dataset("memory", memory=fid.read()) as ncid:
-                        sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+                with Dataset("memory", memory=fid.read()) as ncid:
+                    sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
             for symbol in symbols:
                 if symbol not in tarinfo:
@@ -479,37 +478,57 @@ def read_tarinfo(source, verbose=0):
     return tarinfo
 
 
-def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u8=False, verbose=0):
+def read(source, **kwargs):
+    """
+    read(source, **kwargs):
+
+    Read radar data from a file or a tarball.
+
+    Parameters:
+    source: str - Path to a file or a tarball.
+
+    Optional keyword arguments:
+    verbose: int - Verbosity level, default = 0
+    symbols: list of str, default = ["Z", "V", "W", "D", "P", "R"]
+    finite: bool - Convert NaN to 0, default = False
+    tarinfo: dict - Tarball information, default = None
+    want_tarinfo: bool - Return tarinfo, default = False
+    u8: bool - Convert values to uint8, default = False
+    """
+    verbose = kwargs.get("verbose", 0)
+    symbols = kwargs.get("symbols", ["Z", "V", "W", "D", "P", "R"])
+    finite = kwargs.get("finite", False)
+    tarinfo = kwargs.get("tarinfo", None)
+    want_tarinfo = kwargs.get("want_tarinfo", False)
+    #
     myname = colorize("radar.read()", "green")
     if verbose:
         logger.setLevel(logging.DEBUG if verbose > 1 else logging.INFO)
         show = colorize(source, "yellow")
         logger.info(f"{myname} {show}")
-    if symbols is None:
-        symbols = ["Z", "V", "W", "D", "P", "R"]
     if not os.path.exists(source):
         raise FileNotFoundError(f"{myname} {source} not found")
     ext = os.path.splitext(source)[1]
-    if ext == ".nc":
-        data = _read_nc(source, symbols=symbols, verbose=verbose)
-        tarinfo = {}
-    elif ext in [".xz", ".txz", ".tgz", ".tar"]:
+    if ext in [".txz", ".xz", ".tgz", ".tar"]:
         output = _read_tar(
             source,
+            verbose=verbose,
             symbols=symbols,
             tarinfo=tarinfo,
             want_tarinfo=want_tarinfo,
-            verbose=verbose,
         )
         if want_tarinfo:
             data, tarinfo = output
         else:
             data = output
+    elif ext == ".nc":
+        data = _read_nc(source, symbols=symbols, verbose=verbose)
+        tarinfo = {}
     else:
         raise ValueError(f"{myname} Unsupported file extension {ext}")
     if data is None:
         raise ValueError(f"{myname} No data found in {source}")
-    if u8:
+    if kwargs.get("u8", False):
         data["u8"] = {}
         for key, value in data["products"].items():
             if np.ma.isMaskedArray(value):
