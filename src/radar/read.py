@@ -369,8 +369,10 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         if "*" in tarinfo:
             info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
-                with Dataset("memory", memory=fid.read()) as ncid:
-                    sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+                content = fid.read()
+                with _lock:
+                    with Dataset("memory", memory=content) as ncid:
+                        sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
             for symbol in symbols:
                 if symbol not in tarinfo:
