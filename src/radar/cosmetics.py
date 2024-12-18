@@ -37,6 +37,17 @@ def colorize(text, color="white", end="\033[m"):
         return text
 
 
+def pretty_object_name(classname, name, origin=None):
+    g = f"\033[38;5;{colors['green']}m"
+    y = f"\033[38;5;{colors['gold']}m"
+    p = f"\033[38;5;{colors['purple']}m"
+    w = f"\033[38;5;{colors['white']}m"
+    b = f"\033[38;5;{colors['cyan']}m"
+    if origin is None:
+        return f"{g}{classname}{y}[{p}{name}{y}]\033[m"
+    return f"{g}{classname}{y}[{p}{name}{w}:{b}{origin}{y}]\033[m"
+
+
 def hex2rgba(strs):
     for str in strs:
         r = int(str[:2], 16) / 255
@@ -48,7 +59,16 @@ def hex2rgba(strs):
 def color_name_value(name, value):
     show = colorize(name, "orange")
     show += colorize(" = ", "red")
-    show += colorize(value, "yellow" if isinstance(value, str) else "purple")
+    comma_len = len(colorize(", ", "red"))
+    if isinstance(value, list):
+        show += colorize("[", "gold")
+        for v in value:
+            show += colorize(f'"{v}"', "yellow" if isinstance(v, str) else "purple")
+            show += colorize(", ", "red")
+        show = show[:-comma_len]
+        show += colorize("]", "gold")
+    else:
+        show += colorize(value, "yellow" if isinstance(value, str) else "purple")
     return show
 
 
@@ -72,6 +92,28 @@ def byte_string(payload):
 
         p = f"{payload[0:1]}"
         return p + payload_binary(payload[1:8]) + " ... " + payload_binary(payload[-3:])
+
+
+def truncate_array(arr, front=3, back=3):
+    if len(arr) > front + back:
+        truncated = arr[:front] + ["..."] + arr[-back:]
+    else:
+        truncated = arr
+    return truncated
+
+
+def test_byte_string():
+    x = b'\x03{"Transceiver":{"Value":true,"Enum":0}, "Pedestal":{"Value":true,"Enum":0}, "Time":1570804516}'
+    print(byte_string(x))
+    x = b"\x05\x01}\xff|\x02}\x22\x33\x44\x55\x66\x77\x00}\x00}\x02}\xfe|\x00}\x01}\x00\x22\x33\x44\x55\x01\x00"
+    print(byte_string(x))
+
+
+cross = colorize("✗", "red")
+check = colorize("✓", "green")
+ignore = colorize("✓", "yellow")
+missing = colorize("✗", "orange")
+processed = colorize("✓✓", "green")
 
 
 class NumpyPrettyPrinter(pprint.PrettyPrinter):
@@ -103,9 +145,13 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
             prefix = "array_2d("
             indented_lines = self.indent_lines(data_str, prefix + "data=")
             indented_lines += ",\n" + " " * self._current_indent
-            indented_lines += self.indent_lines(mask_str, " " * len(prefix) + "mask=", array.data.dtype, array.fill_value)
+            indented_lines += self.indent_lines(
+                mask_str, " " * len(prefix) + "mask=", array.data.dtype, array.fill_value
+            )
         else:
-            array_str = np.array2string(array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:6.2f}"})
+            array_str = np.array2string(
+                array, separator=", ", suppress_small=True, formatter={"float_kind": lambda x: f"{x:6.2f}"}
+            )
             indented_lines = self.indent_lines(array_str, "array_2d(", array.dtype)
         return indented_lines
 
@@ -144,6 +190,8 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
             else:
                 self._current_indent = indent + len(repr(key)) + 2
                 write(f"{repr(key)}: ")
-                self._format(ent, stream, indent + len(repr(key)) + 2, allowance if i == last_index else 1, context, level)
+                self._format(
+                    ent, stream, indent + len(repr(key)) + 2, allowance if i == last_index else 1, context, level
+                )
             if i != last_index:
                 write(delimnl)
