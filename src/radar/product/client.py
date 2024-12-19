@@ -1,4 +1,5 @@
 import json
+import atexit
 import pickle
 import socket
 import threading
@@ -19,10 +20,17 @@ class Client(Manager):
         logger = self.logger
         # Wire things up
         self.sockets = []
-        self.connectThread = threading.Thread(target=self._connect)
+        self.connectThread = threading.Thread(target=self._connect, daemon=True)
         self.connectThread.start()
         while self.wantActive and len(self.sockets) < self.count:
             time.sleep(0.1)
+        atexit.register(self.cleanup)
+
+    def __del__(self):
+        self.close()
+
+    def cleanup(self):
+        self.stop()
 
     def _getSocketAndLock(self):
         with self.lock:

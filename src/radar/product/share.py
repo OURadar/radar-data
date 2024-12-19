@@ -38,7 +38,7 @@ class Manager:
     def __init__(self, **kwargs):
         self.name = colorize("Manager", "green")
         self._port = kwargs.get("port", PORT)
-        self.count = clamp(kwargs.get("count", COUNT), 2, 16)
+        self.count = clamp(kwargs.get("count", COUNT), 1, 16)
         self.lock = threading.Lock()
         self.clientLocks = [threading.Lock() for _ in range(self.count)]
         self.logger = kwargs.get("logger", logging.getLogger("producer"))
@@ -50,6 +50,9 @@ class Manager:
             self._originalSigTermHandler = signal.getsignal(signal.SIGTERM)
             signal.signal(signal.SIGINT, self._signalHandler)
             signal.signal(signal.SIGTERM, self._signalHandler)
+
+    def __del__(self):
+        self.stop()
 
     def _signalHandler(self, signum, frame):
         myname = self.name + colorize("._signalHandler", "green")

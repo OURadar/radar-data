@@ -1,3 +1,3 @@
 CHANNEL = "ch-request"
-COUNT = 4
+COUNT = 1
 PORT = 50000
