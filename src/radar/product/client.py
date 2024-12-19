@@ -11,7 +11,7 @@ logger = None
 
 
 class Client(Manager):
-    def __init__(self, n=1, **kwargs):
+    def __init__(self, n=2, **kwargs):
         super().__init__(n, **kwargs)
         self.name = colorize("Client", "green")
         self._host = kwargs.get("host", "localhost")

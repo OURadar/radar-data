@@ -32,7 +32,7 @@ def request(client, file):
 
 if __name__ == "__main__":
 
-    fileHandler = logging.FileHandler(os.path.expanduser("~/logs/producer.log"))
+    fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-client.log"))
     fileHandler.setFormatter(radar.logFormatter)
     logger.addHandler(fileHandler)
     streamHandler = logging.StreamHandler()
