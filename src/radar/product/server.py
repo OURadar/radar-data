@@ -155,7 +155,7 @@ class Server(Manager):
         sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sd.bind((self._host, self._port))
-        sd.settimeout(0.1)
+        sd.settimeout(0.25)
         sd.listen(self.n)
         logger.info(f"{myname} Started")
         while self.wantActive:

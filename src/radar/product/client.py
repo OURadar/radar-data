@@ -36,24 +36,28 @@ class Client(Manager):
     def _connect(self):
         myname = colorize("Client.connect", "green")
         while self.wantActive:
+            logger.info(f"{myname} Connecting to {self._host}:{self._port} ...")
             with self.lock:
                 # Make n connections
                 self._i = 0
                 self.sockets = []
                 for _ in range(self.n):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    logger.info(f"Socket[{sock.fileno()}] Connecting to {self._host}:{self._port} ...")
+                    logger.debug(f"{myname} socket[{sock.fileno()}] connecting ...")
                     try:
                         sock.settimeout(1.0)
                         sock.connect((self._host, self._port))
                     except ConnectionRefusedError:
-                        logger.info(f"{myname} Connection failed ...")
+                        logger.info(f"{myname} Connection refused ...")
                         break
                     except:
-                        logger.info(f"{myname} Unexpected error ...")
+                        logger.warning(f"{myname} Unexpected error ...")
                         break
                     self.sockets.append(sock)
-            if len(self.sockets) == 0:
+            if len(self.sockets) != self.n:
+                logger.info(f"{myname} Only {len(self.sockets)} out of {self.n} connections")
+                for sock in self.sockets:
+                    sock.close()
                 self._shallow_sleep(5.0)
                 continue
             # Keep running until told to stop
@@ -69,12 +73,15 @@ class Client(Manager):
                         except BrokenPipeError:
                             data = None
                             break
+                        except:
+                            logger.warning(f"{myname} socket[{k}] unexpected error during send()")
+                            data = None
                         try:
                             data = recv(sock)
                         except ConnectionResetError:
                             data = None
                         except:
-                            logger.error(f"{myname} sockets[{k}] unexpected error")
+                            logger.warning(f"{myname} sockets[{k}] unexpected error during recv()")
                             data = None
                     if data is None:
                         logger.info(f"{myname} sockets[{k}] server not available")
