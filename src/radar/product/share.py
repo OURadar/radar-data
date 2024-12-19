@@ -39,6 +39,7 @@ class Manager:
         self.lock = threading.Lock()
         self.clientLocks = [threading.Lock() for _ in range(self.n)]
         self.logger = kwargs.get("logger", logging.getLogger("producer"))
+        self.verbose = kwargs.get("verbose", 0)
         self.wakeUp = False
         self.wantActive = True
         if kwargs.get("signal", True):

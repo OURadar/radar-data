@@ -45,7 +45,7 @@ class Client(Manager):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     logger.debug(f"{myname} socket[{sock.fileno()}] connecting ...")
                     try:
-                        sock.settimeout(1.0)
+                        sock.settimeout(2.5)
                         sock.connect((self._host, self._port))
                     except ConnectionRefusedError:
                         logger.info(f"{myname} Connection refused ...")
@@ -58,7 +58,7 @@ class Client(Manager):
                 logger.info(f"{myname} Only {len(self.sockets)} out of {self.n} connections")
                 for sock in self.sockets:
                     sock.close()
-                self._shallow_sleep(5.0)
+                self._shallow_sleep(2.5)
                 continue
             # Keep running until told to stop
             ping = 0
@@ -66,8 +66,9 @@ class Client(Manager):
                 for sock, lock in zip(self.sockets, self.clientLocks):
                     k = sock.fileno()
                     with lock:
-                        sock.settimeout(5.0)
-                        logger.debug(f"{myname} sockets[{k}] ping[{ping}] ...")
+                        sock.settimeout(2.5)
+                        if self.verbose > 2:
+                            logger.debug(f"{myname} sockets[{k}] ping[{ping}] ...")
                         try:
                             send(sock, json.dumps({"ping": ping}).encode())
                         except BrokenPipeError:
