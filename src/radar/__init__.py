@@ -1,4 +1,4 @@
-__version__ = "1.0.0.dev0"
+__version__ = "1.0.0.dev1"
 
 from .read import *
 from .fifobuffer import *
