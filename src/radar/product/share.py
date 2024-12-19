@@ -17,6 +17,9 @@ def recv(socket):
     head = socket.recv(4)
     if not head:
         return None
+    elif head == b"ping":
+        socket.sendall(b"pong\r\n")
+        return None
     size = struct.unpack(">I", head)[0]
     data = bytearray()
     while len(data) < size:

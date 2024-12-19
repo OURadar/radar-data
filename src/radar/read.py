@@ -15,7 +15,7 @@ from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-logger = None
+logger = Logger("radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
@@ -125,6 +125,8 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
+        if version is None:
+            raise ValueError(f"{myname} No version found")
         if verbose:
             logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
