@@ -28,8 +28,8 @@ logger = None
 
 
 class Server(Manager):
-    def __init__(self, n=8, **kwargs):
-        super().__init__(n, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.name = colorize("Server", "green")
         self._host = kwargs.get("host", "0.0.0.0")
         global cache, logger
@@ -156,7 +156,7 @@ class Server(Manager):
         sd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sd.bind((self._host, self._port))
         sd.settimeout(0.25)
-        sd.listen(self.n)
+        sd.listen(32)
         logger.info(f"{myname} Started")
         while self.wantActive:
             try:
@@ -178,7 +178,7 @@ class Server(Manager):
         time.sleep(delay)
         for worker in self.readerThreads:
             worker.start()
-        while self.readerRun.value < self.n:
+        while self.readerRun.value < self.count:
             time.sleep(0.02)
         for worker in self.publisherThreads:
             worker.start()

@@ -1,0 +1,114 @@
+import os
+import sys
+import json
+import time
+import yaml
+import radar
+import pprint
+import logging
+import argparse
+import textwrap
+
+__prog__ = os.path.basename(sys.argv[0])
+logger = logging.getLogger("datashop")
+if sys.version_info[:3] < (3, 8, 0):
+    pp = pprint.PrettyPrinter(indent=1, depth=3, width=120)
+else:
+    pp = pprint.PrettyPrinter(indent=1, depth=3, width=120, sort_dicts=False)
+
+
+def test(verbose=0):
+    print(f"__prog__: {__prog__}")
+    if verbose:
+        print(f"Doing test #N ...")
+    print("Passed")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog=__prog__,
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=textwrap.dedent(
+            f"""\
+        Datashop
+
+        Examples:
+            {__prog__} -v settings.yaml
+        """
+        ),
+        epilog="Copyright (c) Boonleng Cheong",
+    )
+    parser.add_argument("source", nargs="*", help="configuration")
+    parser.add_argument("-c", "--count", type=int, default=None, help="count")
+    parser.add_argument("-l", "--logfile", type=str, default=None, help="log file")
+    parser.add_argument("-p", "--port", type=int, default=None, help="port")
+    parser.add_argument("-t", "--test", action="store_true", help="test")
+    parser.add_argument("-v", dest="verbose", default=0, action="count", help="increases verbosity")
+    parser.add_argument("--version", action="version", version="%(prog)s " + radar.__version__)
+    parser.add_argument("--no-log", action="store_true", help="do not log to file")
+    args = parser.parse_args()
+
+    # Read the configuration file
+    config_file = args.source[0] if len(args.source) else "settings.yaml"
+    _, config_ext = os.path.splitext(config_file)
+    if config_ext == ".json":
+        with open(config_file) as f:
+            config = json.load(f)
+    elif config_ext == ".yml" or config_ext == ".yaml":
+        with open(config_file) as f:
+            config = yaml.safe_load(f)
+    else:
+        logger.error(f"Unsupported configuration {config_ext}")
+        sys.exit(1)
+
+    # Logfile from configuration, override by command line
+    logfile = args.logfile or config.get("logfile", "settings.yaml")
+    # Add FileHandler to always log INFO and above to a file
+    file_handler = logging.FileHandler(logfile)
+    file_handler.setFormatter(radar.logFormatter)
+    logger.addHandler(file_handler)
+    # Add StreamHandler to log to console when verbose > 0
+    if args.verbose:
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(radar.logFormatter)
+        logger.addHandler(stream_handler)
+    # Set logger level to INFO by default
+    if args.verbose > 1:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    logger.info(f"Datashop {radar.__version__}")
+
+    # Test the function
+    if args.test:
+        test(verbose=args.verbose)
+        sys.exit(0)
+
+    # Override other configuration by command line
+    if args.count:
+        config["count"] = args.count
+    if args.port:
+        config["port"] = args.port
+
+    if args.verbose > 1:
+        logger.debug(pp.pformat(config))
+
+    server = radar.product.Server(logger=logger, **config)
+    server.start()
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt ...")
+        pass
+
+    server.stop()
+
+
+###
+
+if __name__ == "__main__":
+    main()

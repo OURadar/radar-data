@@ -5,7 +5,7 @@ import logging
 import threading
 
 from ..cosmetics import colorize
-from .const import PORT
+from .const import COUNT, PORT
 
 
 def send(socket, data):
@@ -35,10 +35,10 @@ def clamp(x, lo, hi):
 
 
 class Manager:
-    def __init__(self, n=4, **kwargs):
+    def __init__(self, **kwargs):
         self.name = colorize("Manager", "green")
         self._port = kwargs.get("port", PORT)
-        self.n = clamp(n, 2, 16)
+        self.count = clamp(kwargs.get("count", COUNT), 2, 16)
         self.lock = threading.Lock()
         self.clientLocks = [threading.Lock() for _ in range(self.n)]
         self.logger = kwargs.get("logger", logging.getLogger("producer"))

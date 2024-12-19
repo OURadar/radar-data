@@ -22,13 +22,13 @@ class Client(Manager):
         self.sockets = []
         self.connectThread = threading.Thread(target=self._connect)
         self.connectThread.start()
-        while self.wantActive and len(self.sockets) < self.n:
+        while self.wantActive and len(self.sockets) < self.count:
             time.sleep(0.1)
 
     def _getSocketAndLock(self):
         with self.lock:
             i = self._i
-            self._i = (i + 1) % self.n
+            self._i = (i + 1) % self.count
         sock = self.sockets[i]
         lock = self.clientLocks[i]
         return sock, lock
@@ -41,7 +41,7 @@ class Client(Manager):
                 # Make n connections
                 self._i = 0
                 self.sockets = []
-                for _ in range(self.n):
+                for _ in range(self.count):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     logger.debug(f"{myname} socket[{sock.fileno()}] connecting ...")
                     try:
@@ -54,8 +54,8 @@ class Client(Manager):
                         logger.warning(f"{myname} Unexpected error ...")
                         break
                     self.sockets.append(sock)
-            if len(self.sockets) != self.n:
-                logger.info(f"{myname} Only {len(self.sockets)} out of {self.n} connections")
+            if len(self.sockets) != self.count:
+                logger.info(f"{myname} Only {len(self.sockets)} out of {self.count} connections")
                 for sock in self.sockets:
                     sock.close()
                 self._shallow_sleep(2.5)

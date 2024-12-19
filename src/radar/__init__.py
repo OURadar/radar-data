@@ -5,3 +5,4 @@ from .fifobuffer import *
 from .cosmetics import logFormatter
 
 from . import product
+from . import service

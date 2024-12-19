@@ -28,6 +28,9 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/ouradar/radar-data"
 
+[project.scripts]
+datashop = "radar.service.datashop:main"
+
 [tool.setuptools]
 include-package-data = true
 
