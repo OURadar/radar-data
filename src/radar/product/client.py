@@ -1,7 +1,6 @@
 import json
 import pickle
 import socket
-import logging
 import threading
 
 from .share import *
@@ -11,8 +10,8 @@ logger = None
 
 
 class Client(Manager):
-    def __init__(self, n=2, **kwargs):
-        super().__init__(n, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.name = colorize("Client", "green")
         self._host = kwargs.get("host", "localhost")
         self._i = 0

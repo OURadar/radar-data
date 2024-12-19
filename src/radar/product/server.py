@@ -43,7 +43,7 @@ class Server(Manager):
         self.dataQueue = mp.Queue()
         self.readerRun = mp.Value("i", 0)
         self.readerThreads = []
-        for k in range(self.n):
+        for k in range(self.count):
             worker = mp.Process(target=self._reader, args=(k,))
             self.readerThreads.append(worker)
         self.publisherThreads = []
@@ -204,4 +204,12 @@ class Server(Manager):
         self.connectorThread.join()
         logger.info(f"{self.name} Stopped")
         super().stop(callback, args)
+        return 0
+
+    def join(self):
+        for worker in self.readerThreads:
+            worker.join()
+        for worker in self.publisherThreads:
+            worker.join()
+        self.connectorThread.join()
         return 0

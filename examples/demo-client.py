@@ -43,9 +43,9 @@ if __name__ == "__main__":
     logger.info("Starting ...")
 
     if bool(os.environ.get("DJANGO_DEBUG")):
-        client = radar.product.Client(n=6, port=6969, logger=logger)
+        client = radar.product.Client(count=6, port=50000, logger=logger)
     else:
-        client = radar.product.Client(n=6, logger=logger)
+        client = radar.product.Client(count=6, logger=logger)
 
     files = sorted(glob.glob("/mnt/data/PX1000/2024/20240820/_original/*xz"))
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         req = threading.Thread(target=request, args=(client, file))
         req.start()
         fifo.enqueue(req)
-        while fifo.size() >= client.n * 2:
+        while fifo.size() >= client.count * 2:
             req = fifo.dequeue()
             req.join()
         # Simulate a random delay

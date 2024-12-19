@@ -40,7 +40,7 @@ class Manager:
         self._port = kwargs.get("port", PORT)
         self.count = clamp(kwargs.get("count", COUNT), 2, 16)
         self.lock = threading.Lock()
-        self.clientLocks = [threading.Lock() for _ in range(self.n)]
+        self.clientLocks = [threading.Lock() for _ in range(self.count)]
         self.logger = kwargs.get("logger", logging.getLogger("producer"))
         self.verbose = kwargs.get("verbose", 0)
         self.wakeUp = False
