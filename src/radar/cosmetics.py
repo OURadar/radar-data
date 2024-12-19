@@ -3,13 +3,14 @@
 #
 
 import pprint
+import logging
 import numpy as np
 
 colors = {
     "red": 196,
     "orange": 214,
-    "yellow": 227,
-    "green": 118,
+    "yellow": 228,
+    "green": 154,
     "mint": 43,
     "teal": 87,
     "cyan": 14,
@@ -18,10 +19,12 @@ colors = {
     "purple": 141,
     "white": 15,
     "gray": 239,
+    "gold": 220,
     "black": 232,
+    "skyblue": 45,
 }
 
-highlights = {"warning": "\033[48;5;172;38;5;15m", "error": "\033[1;48;5;3;38;5;15m"}
+highlights = {"info": "\033[48;5;6;38;5;15m", "warning": "\033[48;5;172;38;5;15m", "error": "\033[1;48;5;3;38;5;15m"}
 
 
 def colorize(text, color="white", end="\033[m"):
@@ -109,13 +112,6 @@ def test_byte_string():
     print(byte_string(x))
 
 
-cross = colorize("✗", "red")
-check = colorize("✓", "green")
-ignore = colorize("✓", "yellow")
-missing = colorize("✗", "orange")
-processed = colorize("✓✓", "green")
-
-
 class NumpyPrettyPrinter(pprint.PrettyPrinter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -195,3 +191,12 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 )
             if i != last_index:
                 write(delimnl)
+
+
+cross = colorize("✗", "red")
+check = colorize("✓", "green")
+ignore = colorize("✓", "yellow")
+missing = colorize("✗", "orange")
+processed = colorize("✓✓", "green")
+
+logFormatter = logging.Formatter("%(asctime)s - %(levelname)-7s - %(message)s")

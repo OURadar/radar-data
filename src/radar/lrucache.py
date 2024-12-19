@@ -11,26 +11,22 @@ class LRUCache:
         self.capacity = capacity
         self.cache = OrderedDict()
 
-    def get(self, key: str, decompress=True) -> bytes:
+    def get(self, key: str) -> bytes:
         if key not in self.cache:
             return None
         else:
             with lock:
                 # Move the accessed key to the end to mark it as recently used
                 self.cache.move_to_end(key)
-                if decompress:
-                    return zlib.decompress(self.cache[key])
-                return self.cache[key]
+                item = self.cache[key]
+                return zlib.decompress(item["data"]) if item["compress"] else item["data"]
 
     def put(self, key: str, value: bytes, compress=True):
         with lock:
             if key in self.cache:
                 # Update the value of the existing key and move it to the end
                 self.cache.move_to_end(key)
-            if compress:
-                self.cache[key] = zlib.compress(value)
-            else:
-                self.cache[key] = value
+            self.cache[key] = {"compress": compress, "data": zlib.compress(value) if compress else value}
             if len(self.cache) > self.capacity:
                 # Remove the first item (least recently used) from the cache
                 self.cache.popitem(last=False)
