@@ -13,7 +13,7 @@ SIMULATE_DELAY = False
 
 
 def request(client, file):
-    logger.debug(f"Req: {file} ...")
+    logger.info(f"Req: {file} ...")
     data = client.get(file)
     if data is None:
         logger.info(f"Ign: {file} ...")
@@ -38,11 +38,11 @@ if __name__ == "__main__":
     streamHandler = logging.StreamHandler()
     streamHandler.setFormatter(radar.logFormatter)
     logger.addHandler(streamHandler)
+    logger.setLevel(logging.INFO)
 
     logger.info("Starting ...")
 
     if bool(os.environ.get("DJANGO_DEBUG")):
-        logger.setLevel(logging.DEBUG)
         client = radar.product.Client(n=6, port=6969, logger=logger)
     else:
         client = radar.product.Client(n=6, logger=logger)
@@ -62,10 +62,8 @@ if __name__ == "__main__":
         # Simulate a random delay
         if SIMULATE_DELAY:
             period = random.randint(0, 13)
-            for k in range(period):
-                if client.wantActive:
-                    # logger.debug(f"Sleeping {k} / {period} ...")
-                    time.sleep(0.1)
+            logger.debug(f"Sleeping for {period} second{'s' if period > 1 else ''} ...")
+            client._shallow_sleep(period)
     for req in fifo.queue:
         req.join()
     toc = time.time()
