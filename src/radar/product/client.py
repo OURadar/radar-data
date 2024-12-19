@@ -42,12 +42,15 @@ class Client(Manager):
                 self.sockets = []
                 for _ in range(self.n):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    logger.info(f"Socker[{sock.fileno()}] Connecting to {self._host}:{self._port} ...")
+                    logger.info(f"Socket[{sock.fileno()}] Connecting to {self._host}:{self._port} ...")
                     try:
                         sock.settimeout(1.0)
                         sock.connect((self._host, self._port))
                     except ConnectionRefusedError:
                         logger.info(f"{myname} Connection failed ...")
+                        break
+                    except:
+                        logger.info(f"{myname} Unexpected error ...")
                         break
                     self.sockets.append(sock)
             if len(self.sockets) == 0:
