@@ -4,5 +4,6 @@ from .read import *
 from .fifobuffer import *
 from .cosmetics import logFormatter
 
+from . import cosmetics
 from . import product
 from . import service

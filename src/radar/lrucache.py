@@ -1,3 +1,4 @@
+import sys
 import zlib
 import threading
 
@@ -32,9 +33,25 @@ class LRUCache:
                 self.cache.popitem(last=False)
 
     def size(self) -> str:
-        total = 0
-        for item in self.cache.values():
-            total += len(item)
+        def get_size(obj, seen=None):
+            """Recursively find the size of objects."""
+            size = sys.getsizeof(obj)
+            if seen is None:
+                seen = set()
+            obj_id = id(obj)
+            if obj_id in seen:
+                return 0
+            seen.add(obj_id)
+            if isinstance(obj, dict):
+                size += sum([get_size(v, seen) for v in obj.values()])
+                size += sum([get_size(k, seen) for k in obj.keys()])
+            elif hasattr(obj, "__dict__"):
+                size += get_size(obj.__dict__, seen)
+            elif hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes, bytearray)):
+                size += sum([get_size(i, seen) for i in obj])
+            return size
+
         count = len(self.cache)
         s = "s" if count > 1 else ""
+        total = get_size(self.cache)
         return f"{count} item{s}   {total:,d} B"
