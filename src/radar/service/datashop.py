@@ -41,26 +41,28 @@ def request(client, file, verbose=0):
     return data
 
 
-def test(args, config):
-    print("config", config)
-    print(f"Initializing ... port = {args.port}   folder = {args.test}")
-    client = radar.product.Client(count=6, host=args.host, port=args.port, verbose=args.verbose)
+def test(**kwargs):
+    print("kwargs", kwargs)
+    folder = kwargs.get("folder")
+    verbose = kwargs.get("verbose", 0)
+    print(f"Initializing ... port = {kwargs.get("port")}   folder = {folder}")
+    client = radar.product.Client(**kwargs)
     fifo = radar.FIFOBuffer()
     tic = time.time()
 
-    files = client.custom("list", folder=args.test)
+    files = client.custom("list", folder=folder)
 
     for file in files[-200:-100] if len(files) > 200 else files[:100]:
-        req = threading.Thread(target=request, args=(client, file, args.verbose))
+        req = threading.Thread(target=request, args=(client, file, verbose))
         req.start()
         fifo.enqueue(req)
         while fifo.size() >= client.count * 2:
             req = fifo.dequeue()
             req.join()
         # Simulate delays
-        if args.delay:
+        if kwargs.get("delay", False):
             period = random.randint(0, 13)
-            if args.verbose > 1:
+            if verbose > 1:
                 print(f"Sleeping for {period} second{'s' if period > 1 else ''} ...")
             client._shallow_sleep(period)
     for req in fifo.queue:
@@ -118,7 +120,7 @@ def main():
             logger.error(f"Unsupported configuration {config_ext}")
             sys.exit(1)
     else:
-        config = {}
+        config = {"host": "localhost", "port": 50001, "count": 4, "cache": 1000}
 
     # Logfile from configuration, override by command line
     logfile = args.logfile or config.get("logfile", "datashop.log")
@@ -140,19 +142,19 @@ def main():
     logger.info(f"Datashop {radar.__version__}")
 
     # Override other configuration by command line
-    if args.count:
-        config["count"] = args.count
     if args.host:
         config["host"] = args.host
     if args.port:
         config["port"] = args.port
+    if args.count:
+        config["count"] = args.count
 
     if args.verbose > 1:
         logger.debug(pp.pformat(config))
 
     # Test the function
     if args.test:
-        test(args, **config)
+        test(**config, folder=args.test, delay=args.delay, verbose=args.verbose)
         sys.exit(0)
 
     # Start the server
