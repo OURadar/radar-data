@@ -91,6 +91,7 @@ def main():
     parser.add_argument("source", nargs="*", help="configuration")
     parser.add_argument("-c", "--count", type=int, default=None, help="count")
     parser.add_argument("-d", "--dir", type=str, default=None, help="directory")
+    parser.add_argument("-h", "--host", type=str, default=None, help="host")
     parser.add_argument("-l", "--logfile", type=str, default=None, help="log file")
     parser.add_argument("-p", "--port", type=int, default=None, help="port")
     parser.add_argument("-t", "--test", action=None, help="test using directory")
@@ -146,6 +147,8 @@ def main():
     # Override other configuration by command line
     if args.count:
         config["count"] = args.count
+    if args.host:
+        config["host"] = args.host
     if args.port:
         config["port"] = args.port
 
