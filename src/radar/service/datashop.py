@@ -3,7 +3,6 @@
 
 import os
 import sys
-import glob
 import json
 import time
 import yaml
@@ -15,6 +14,7 @@ import argparse
 import textwrap
 import threading
 import setproctitle
+
 
 __prog__ = "datashop"
 logger = logging.getLogger(__prog__)
@@ -42,14 +42,13 @@ def request(client, file, verbose=0):
 
 
 def test(args):
-    if not os.path.exists(args.test):
-        print(f"Directory {args.test} does not exist")
-        return
-    files = sorted(glob.glob(os.path.join(args.test, "*xz")))
-    print(f"Initializing ... port = {args.port}  len(files) = {len(files)}")
+    print(f"Initializing ... port = {args.port}   folder = {args.test}")
     client = radar.product.Client(count=6, port=args.port, verbose=args.verbose)
-    tic = time.time()
     fifo = radar.FIFOBuffer()
+    tic = time.time()
+
+    files = client.custom("list", folder=args.test)
+
     for file in files[-200:-100] if len(files) > 200 else files[:100]:
         req = threading.Thread(target=request, args=(client, file, args.verbose))
         req.start()
@@ -94,7 +93,7 @@ def main():
     parser.add_argument("-H", "--host", type=str, default=None, help="host")
     parser.add_argument("-l", "--logfile", type=str, default=None, help="log file")
     parser.add_argument("-p", "--port", type=int, default=None, help="port")
-    parser.add_argument("-t", "--test", action=None, help="test using directory")
+    parser.add_argument("-t", "--test", type=str, help="test using directory")
     parser.add_argument("-v", dest="verbose", default=0, action="count", help="increases verbosity")
     parser.add_argument("--delay", action="store_true", help="simulate request delays")
     parser.add_argument("--version", action="version", version="%(prog)s " + radar.__version__)

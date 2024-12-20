@@ -137,6 +137,20 @@ class Client(Manager):
                 return None
         return message.decode("utf-8")
 
+    def custom(self, command, **kwargs):
+        if self.sockets == []:
+            logger.info(f"{self.name} Not connected")
+            return None
+        sock, lock = self._getSocketAndLock()
+        with lock:
+            sock.settimeout(5.0)
+            payload = json.dumps({"custom": command, **kwargs}).encode()
+            send(sock, payload)
+            message = recv(sock)
+            if command == "list":
+                message = json.loads(message)
+        return message
+
     def close(self):
         self.wantActive = False
         self.connectThread.join()

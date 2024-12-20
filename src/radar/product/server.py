@@ -1,4 +1,5 @@
 import os
+import glob
 import json
 import time
 import radar
@@ -122,7 +123,6 @@ class Server(Manager):
                     continue
                 elif "path" in request:
                     name = os.path.basename(request["path"])
-                    # data = cache.get(name, decompress=False)
                     data = cache.get(name)
                     logger.info(f"{myname} Sweep: {name}")
                     if data is None:
@@ -137,6 +137,15 @@ class Server(Manager):
                         self.tasked[fileno] = False
                 elif "stats" in request:
                     send(clientSocket, str(cache.size()).encode())
+                elif "custom" in request:
+                    command = request["custom"]
+                    if command == "list" and "folder" in request:
+                        files = sorted(glob.glob(os.path.join(request["folder"], "[A-Za-z0-9]*z")))
+                        payload = json.dumps(files).encode()
+                    send(clientSocket, payload)
+                else:
+                    logger.warn(f"{myname} Unknown request {request}")
+                    continue
                 # Wait for publisher to respond before taking another request
                 while self.tasked[fileno] and self.wantActive:
                     time.sleep(0.05)
