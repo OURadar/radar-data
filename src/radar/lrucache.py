@@ -20,14 +20,14 @@ class LRUCache:
                 # Move the accessed key to the end to mark it as recently used
                 self.cache.move_to_end(key)
                 item = self.cache[key]
-                return zlib.decompress(item["data"]) if item["compress"] else item["data"]
+                return zlib.decompress(item["blob"]) if item["compress"] else item["blob"]
 
     def put(self, key: str, value: bytes, compress=True):
         with lock:
             if key in self.cache:
                 # Update the value of the existing key and move it to the end
                 self.cache.move_to_end(key)
-            self.cache[key] = {"compress": compress, "data": zlib.compress(value) if compress else value}
+            self.cache[key] = {"compress": compress, "blob": zlib.compress(value) if compress else value}
             if len(self.cache) > self.capacity:
                 # Remove the first item (least recently used) from the cache
                 self.cache.popitem(last=False)

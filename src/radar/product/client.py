@@ -79,29 +79,30 @@ class Client(Manager):
                         try:
                             send(sock, json.dumps({"ping": ping}).encode())
                         except BrokenPipeError:
-                            data = None
+                            pong = None
                             break
                         except:
-                            logger.warning(f"{myname} socket[{k}] unexpected error during send()")
-                            data = None
+                            logger.warning(f"{myname} socket[{k}] unexpected error during ping.send()")
+                            pong = None
+                            break
                         try:
-                            data = recv(sock)
+                            pong = recv(sock)
                         except ConnectionResetError:
-                            data = None
+                            pong = None
                         except:
-                            logger.warning(f"{myname} sockets[{k}] unexpected error during recv()")
-                            data = None
-                    if data is None:
+                            logger.warning(f"{myname} sockets[{k}] unexpected error during ping.recv()")
+                            pong = None
+                    if pong is None:
                         logger.info(f"{myname} sockets[{k}] server not available")
                         break
-                if data is None:
+                if pong is None:
                     break
                 self._shallow_sleep(10.0)
                 ping += 1
             for sock in self.sockets:
                 sock.close()
 
-    def get(self, path, tarinfo=None):
+    def get(self, path, tarinfo=None, want_tarinfo=False):
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
             return None
@@ -110,17 +111,21 @@ class Client(Manager):
             sock.settimeout(5.0)
             try:
                 send(sock, json.dumps({"path": path, "tarinfo": tarinfo}).encode())
-                data = recv(sock)
+                info = recv(sock)
             except BrokenPipeError:
                 myname = pretty_object_name("Client.get", sock.fileno())
                 logger.warning(f"{myname} BrokenPipeError")
-                data = None
-        if data is None:
+                info = None
+        if info is None:
             myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} Server not available")
             self.wakeUp = True
             return None
-        return pickle.loads(data)
+        output = pickle.loads(info)
+        data, new_tarinfo = output["data"], output["tarinfo"]
+        if want_tarinfo:
+            return data, new_tarinfo
+        return data
 
     def stats(self):
         if self.sockets == []:

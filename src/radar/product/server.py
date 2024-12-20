@@ -48,7 +48,7 @@ class Server(Manager):
             worker = mp.Process(target=self._reader, args=(k,))
             self.readerThreads.append(worker)
         self.publisherThreads = []
-        for k in range(2):
+        for k in range(clamp(self.count // 2, 1, 2)):
             worker = threading.Thread(target=self._publisher, args=(k,))
             self.publisherThreads.append(worker)
         self.connectorThread = threading.Thread(target=self._listen)
@@ -69,16 +69,15 @@ class Server(Manager):
                 tarinfo = request.get("tarinfo", None)
                 fileno = request["fileno"]
                 path = request["path"]
-                data = radar.read(path, tarinfo=tarinfo)
-                data = pickle.dumps(data)
-                self.dataQueue.put({"fileno": fileno, "path": path, "data": data})
+                data, tarinfo = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
+                info = pickle.dumps({"data": data, "tarinfo": tarinfo})
+                self.dataQueue.put({"fileno": fileno, "path": path, "info": info})
                 request.task_done()
             except:
                 pass
         logger.info(f"{myname} Stopped")
 
     def _publisher(self, id):
-        # myname = colorize(f"Server.publisher", "green")
         myname = pretty_object_name("Server.publisher", f"{id:02d}")
         logger.info(f"{myname} Started")
         tag = colorize("Drive", "skyblue")
@@ -87,15 +86,15 @@ class Server(Manager):
                 result = self.dataQueue.get(timeout=0.05)
                 fileno = result["fileno"]
                 if fileno not in self.clients:
-                    logger.warn(f"{myname} Client {fileno} not found")
+                    logger.warning(f"{myname} Client {fileno} not found")
                     continue
                 sock = self.clients[fileno]
                 name = os.path.basename(result["path"])
-                data = result["data"]
-                cache.put(name, data)
-                sock.settimeout(1.0)
-                send(sock, data)
-                logger.info(f"{myname} {tag}: {name} ({len(data):,d} B) <{fileno}>")
+                info = result["info"]
+                cache.put(name, info)
+                sock.settimeout(2.5)
+                send(sock, info)
+                logger.info(f"{myname} {tag}: {name} ({len(info):,d} B) <{fileno}>")
                 self.tasked[fileno] = False
                 result.task_done()
             except:
@@ -120,20 +119,19 @@ class Server(Manager):
                 logger.debug(f"{myname} {request}")
                 if "ping" in request:
                     send(clientSocket, json.dumps({"pong": request["ping"]}).encode())
-                    continue
                 elif "path" in request:
                     name = os.path.basename(request["path"])
-                    data = cache.get(name)
+                    info = cache.get(name)
                     logger.info(f"{myname} Sweep: {name}")
-                    if data is None:
+                    if info is None:
                         # Queue it up for reader, and let _publisher() respond
                         request["fileno"] = fileno
                         self.tasked[fileno] = True
                         self.taskQueue.put(request)
                     else:
                         # Respond immediately from cache
-                        logger.info(f"{myname} {tag}: {name} ({len(data):,d} B)")
-                        send(clientSocket, data)
+                        logger.info(f"{myname} {tag}: {name} ({len(info):,d} B)")
+                        send(clientSocket, info)
                         self.tasked[fileno] = False
                 elif "stats" in request:
                     send(clientSocket, str(cache.size()).encode())
@@ -145,7 +143,6 @@ class Server(Manager):
                     send(clientSocket, payload)
                 else:
                     logger.warn(f"{myname} Unknown request {request}")
-                    continue
                 # Wait for publisher to respond before taking another request
                 while self.tasked[fileno] and self.wantActive:
                     time.sleep(0.05)
