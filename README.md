@@ -29,3 +29,9 @@ sweep = radar.read(file)
 file = os.path.expanduser("~/Downloads/data/PX-20240529-150246-E4.0.txz")
 sweep = radar.read(file)
 ```
+
+## DataShop
+
+```
+python src/radar/service/datashop.py -v -H 10.197.14.52 -p 50001 -c 4 -t /mnt/data/PX1000/2024/20241219/_original
+```
