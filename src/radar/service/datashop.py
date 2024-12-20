@@ -41,9 +41,10 @@ def request(client, file, verbose=0):
     return data
 
 
-def test(args):
+def test(args, config):
+    print("config", config)
     print(f"Initializing ... port = {args.port}   folder = {args.test}")
-    client = radar.product.Client(count=6, port=args.port, verbose=args.verbose)
+    client = radar.product.Client(count=6, host=args.host, port=args.port, verbose=args.verbose)
     fifo = radar.FIFOBuffer()
     tic = time.time()
 
@@ -138,11 +139,6 @@ def main():
 
     logger.info(f"Datashop {radar.__version__}")
 
-    # Test the function
-    if args.test:
-        test(args)
-        sys.exit(0)
-
     # Override other configuration by command line
     if args.count:
         config["count"] = args.count
@@ -154,6 +150,12 @@ def main():
     if args.verbose > 1:
         logger.debug(pp.pformat(config))
 
+    # Test the function
+    if args.test:
+        test(args, **config)
+        sys.exit(0)
+
+    # Start the server
     server = radar.product.Server(logger=logger, **config)
     server.start()
 
