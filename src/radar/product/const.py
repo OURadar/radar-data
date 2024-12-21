@@ -1,3 +1,3 @@
-CHANNEL = "ch-request"
+CHANNEL = "radar-data-request"
 COUNT = 1
-PORT = 50000
+PORT = 6969

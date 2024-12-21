@@ -6,7 +6,6 @@ import sys
 import json
 import time
 import yaml
-import radar
 import pprint
 import random
 import logging
@@ -15,6 +14,11 @@ import textwrap
 import threading
 import setproctitle
 
+srcDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
+if os.path.exists(srcDir):
+    sys.path.insert(0, srcDir)
+
+import radar
 
 __prog__ = "datashop"
 logger = logging.getLogger(__prog__)
@@ -22,6 +26,10 @@ if sys.version_info[:3] < (3, 8, 0):
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120)
 else:
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120, sort_dicts=False)
+
+
+def is_foreground():
+    return os.isatty(sys.stdin.fileno()) and os.isatty(sys.stdout.fileno()) and os.isatty(sys.stderr.fileno())
 
 
 def request(client, file, verbose=0):
@@ -120,7 +128,7 @@ def main():
             logger.error(f"Unsupported configuration {config_ext}")
             sys.exit(1)
     else:
-        config = {"host": "localhost", "port": 50001, "count": 4, "cache": 1000}
+        config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000}
 
     # Logfile from configuration, override by command line
     logfile = args.logfile or config.get("logfile", "datashop.log")
@@ -161,14 +169,21 @@ def main():
     server = radar.product.Server(logger=logger, **config)
     server.start()
 
-    try:
-        while True:
+    if is_foreground():
+        logger.info("Press Ctrl-C to stop ...")
+        try:
+            while server.wantActive:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt ...")
+            pass
+        except:
+            logger.info("Something else")
+            pass
+    else:
+        while server.wantActive:
             time.sleep(0.1)
-    except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt ...")
-        pass
 
-    server.join()
     logger.info("Done")
 
 

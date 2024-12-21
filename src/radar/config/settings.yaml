@@ -2,4 +2,4 @@ host: localhost
 port: 50000
 count: 4
 cache: 1000
-logfile: /var/log/radarhub/datashop.log
+logfile: /var/log/datashop.log

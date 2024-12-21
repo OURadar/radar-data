@@ -52,6 +52,7 @@ class Server(Manager):
             worker = threading.Thread(target=self._publisher, args=(k,))
             self.publisherThreads.append(worker)
         self.connectorThread = threading.Thread(target=self._listen)
+        logger.info(pretty_object_name("Server", self._host, self._port))
 
     def _reader(self, id):
         myname = pretty_object_name("Server.reader", f"{id:02d}")
@@ -210,12 +211,12 @@ class Server(Manager):
         self.connectorThread.join()
         logger.info(f"{self.name} Stopped")
         super().stop(callback, args)
-        return 0
 
     def join(self):
+        logger.info("Waiting for all threads to join ...")
         for worker in self.readerThreads:
             worker.join()
         for worker in self.publisherThreads:
             worker.join()
         self.connectorThread.join()
-        return 0
+        logger.info(f"{self.name} Joined")

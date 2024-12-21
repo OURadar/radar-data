@@ -1,5 +1,5 @@
+import radar
 import numpy as np
-import src.radar as radar
 
 dummy_sweep = {
     "kind": "U",

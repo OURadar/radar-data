@@ -65,7 +65,7 @@ class Manager:
     def _afterStop(self, signum, frame):
         if signum == signal.SIGINT and self._originalSigIntHandler:
             self._originalSigIntHandler(signum, frame)
-        if signum == signal.SIGTERM and self._originalSigTermHandler:
+        elif signum == signal.SIGTERM and self._originalSigTermHandler:
             self._originalSigTermHandler(signum, frame)
 
     def _shallow_sleep(self, seconds):

@@ -19,25 +19,23 @@ logger = Logger("radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
-re_2parts = re.compile(
-    r"(?P<name>.+)-(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-)
+re_2parts = re.compile(r"(?P<name>.+)-(?P<time>20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d)-")
 re_3parts = re.compile(
     r"(?P<name>.+)-"
-    + r"(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-    + r"(?P<scan>([EA][0-9]+\.[0-9]|N[0-9]+))"
+    + r"(?P<time>20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d)-"
+    + r"(?P<scan>([EA]\d+\.\d|N\d+))"
 )
 re_4parts = re.compile(
     r"(?P<name>.+)-"
-    + r"(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-    + r"(?P<scan>([EA][0-9]+\.[0-9]|N[0-9]+))-"
+    + r"(?P<time>20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d)-"
+    + r"(?P<scan>([EA]\d+\.\d|N\d+))-"
     + r"(?P<symbol>[A-Za-z0-9]+)"
 )
 re_cf_version = re.compile(r"(CF|Cf|cf).+-(?P<version>[0-9]+\.[0-9]+)")
-re_datetime_a = re.compile(r"(?<=-)20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9].[0-9]+")
-re_datetime_b = re.compile(r"(?<=-)20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9]")
-re_datetime_f = re.compile(r"20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9].[0-9]+")
-re_datetime_s = re.compile(r"20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9]")
+re_datetime_a = re.compile(r"(?<=-)20\d{2}(0\d|1[0-2])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d\.\d+")
+re_datetime_b = re.compile(r"(?<=-)20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d")
+re_datetime_f = re.compile(r"20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d.\d+")
+re_datetime_s = re.compile(r"20\d{2}(0\d|1[012])([0-2]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d")
 
 empty_sweep = {
     "kind": "U",
@@ -111,7 +109,7 @@ def val2ind(v, symbol="Z"):
     return np.nan_to_num(np.clip(np.round(u8), 1.0, 255.0), copy=False).astype(np.uint8)
 
 
-def starts_with_cf(string):
+def _starts_with_cf(string):
     return bool(re.match(r"^cf", string, re.IGNORECASE))
 
 
@@ -121,7 +119,7 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if verbose > 2:
         logger.debug(attrs)
     # CF-Radial format contains "Conventions" and "version"
-    if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
+    if "Conventions" in attrs and _starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
@@ -527,20 +525,3 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
 
 def pprint(obj):
     return sweep_printer.pprint(obj)
-
-
-def initLogger():
-    global logger
-    prog = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-    logger = Logger(prog if prog else "radar-data")
-    return logger
-
-
-def setLogger(newLogger):
-    global logger
-    logger = newLogger
-
-
-##
-
-initLogger()
