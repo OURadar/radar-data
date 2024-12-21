@@ -122,6 +122,10 @@ class Client(Manager):
             self.wakeUp = True
             return None
         output = pickle.loads(info)
+        if output is None:
+            myname = pretty_object_name("Client.get", sock.fileno())
+            logger.error(f"{myname} No output")
+            return None
         data, new_tarinfo = output["data"], output["tarinfo"]
         if want_tarinfo:
             return data, new_tarinfo
