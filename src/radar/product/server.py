@@ -90,6 +90,7 @@ class Server(Manager):
                     logger.warning(f"{myname} Client {fileno} not found")
                     continue
                 sock = self.clients[fileno]
+                # Use basname to as key to cache
                 name = os.path.basename(result["path"])
                 info = result["info"]
                 cache.put(name, info)

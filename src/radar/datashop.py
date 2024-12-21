@@ -53,7 +53,7 @@ def test(**kwargs):
     print("kwargs", kwargs)
     folder = kwargs.get("folder")
     verbose = kwargs.get("verbose", 0)
-    print(f"Initializing ... port = {kwargs.get("port")}   folder = {folder}")
+    print(f"Initializing ... port = {kwargs.get('port')}   folder = {folder}")
     client = radar.product.Client(**kwargs)
     fifo = radar.FIFOBuffer()
     tic = time.time()
