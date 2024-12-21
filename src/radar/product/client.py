@@ -43,7 +43,7 @@ class Client(Manager):
     def _connect(self):
         myname = colorize("Client.connect", "green")
         while self.wantActive:
-            logger.info(f"{myname} Connecting to {self._host}:{self._port} ...")
+            logger.info(f"{myname} Connecting {self._host}:{self._port} ...")
             with self.lock:
                 # Make n connections
                 self._i = 0
@@ -57,8 +57,8 @@ class Client(Manager):
                     except ConnectionRefusedError:
                         logger.info(f"{myname} Connection refused ...")
                         break
-                    except:
-                        logger.warning(f"{myname} Unexpected error ...")
+                    except Exception as e:
+                        logger.warning(f"{myname} Unexpected error: {e}")
                         break
                     self.sockets.append(sock)
             if len(self.sockets) != self.count:
@@ -81,10 +81,9 @@ class Client(Manager):
                         except BrokenPipeError:
                             pong = None
                             break
-                        except:
-                            logger.warning(f"{myname} socket[{k}] unexpected error during ping.send()")
-                            pong = None
-                            break
+                        except Exception as e:
+                            logger.warning(f"{myname} socket[{k}] unexpected error during send() {e}")
+                            data = None
                         try:
                             pong = recv(sock)
                         except ConnectionResetError:
