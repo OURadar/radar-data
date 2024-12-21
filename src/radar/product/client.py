@@ -82,14 +82,14 @@ class Client(Manager):
                             pong = None
                             break
                         except Exception as e:
-                            logger.warning(f"{myname} socket[{k}] unexpected error during send() {e}")
-                            data = None
+                            logger.warning(f"{myname} socket[{k}] unexpected error during ping.send() {e}")
+                            pong = None
                         try:
                             pong = recv(sock)
                         except ConnectionResetError:
                             pong = None
-                        except:
-                            logger.warning(f"{myname} sockets[{k}] unexpected error during ping.recv()")
+                        except Exception as e:
+                            logger.warning(f"{myname} sockets[{k}] unexpected error during ping.recv() {e}")
                             pong = None
                     if pong is None:
                         logger.info(f"{myname} sockets[{k}] server not available")
@@ -110,20 +110,24 @@ class Client(Manager):
             sock.settimeout(5.0)
             try:
                 send(sock, json.dumps({"path": path, "tarinfo": tarinfo}).encode())
-                info = recv(sock)
+                blob = recv(sock)
             except BrokenPipeError:
                 myname = pretty_object_name("Client.get", sock.fileno())
                 logger.warning(f"{myname} BrokenPipeError")
-                info = None
-        if info is None:
+                blob = None
+        if blob is None:
             myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} Server not available")
             self.wakeUp = True
+            if want_tarinfo:
+                return None, None
             return None
-        output = pickle.loads(info)
+        output = pickle.loads(blob)
         if output is None:
             myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} No output")
+            if want_tarinfo:
+                return None, None
             return None
         data, new_tarinfo = output["data"], output["tarinfo"]
         if want_tarinfo:

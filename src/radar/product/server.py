@@ -71,8 +71,8 @@ class Server(Manager):
                 fileno = request["fileno"]
                 path = request["path"]
                 data, tarinfo = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
-                info = pickle.dumps({"data": data, "tarinfo": tarinfo})
-                self.dataQueue.put({"fileno": fileno, "path": path, "info": info})
+                blob = pickle.dumps({"data": data, "tarinfo": tarinfo})
+                self.dataQueue.put({"fileno": fileno, "path": path, "blob": blob})
                 request.task_done()
             except:
                 pass
@@ -92,11 +92,11 @@ class Server(Manager):
                 sock = self.clients[fileno]
                 # Use basname to as key to cache
                 name = os.path.basename(result["path"])
-                info = result["info"]
-                cache.put(name, info)
+                blob = result["blob"]
+                cache.put(name, blob)
                 sock.settimeout(2.5)
-                send(sock, info)
-                logger.info(f"{myname} {tag}: {name} ({len(info):,d} B) <{fileno}>")
+                send(sock, blob)
+                logger.info(f"{myname} {tag}: {name} ({len(blob):,d} B) <{fileno}>")
                 self.tasked[fileno] = False
                 result.task_done()
             except:
@@ -123,17 +123,17 @@ class Server(Manager):
                     send(clientSocket, json.dumps({"pong": request["ping"]}).encode())
                 elif "path" in request:
                     name = os.path.basename(request["path"])
-                    info = cache.get(name)
+                    blob = cache.get(name)
                     logger.info(f"{myname} Sweep: {name}")
-                    if info is None:
+                    if blob is None:
                         # Queue it up for reader, and let _publisher() respond
                         request["fileno"] = fileno
                         self.tasked[fileno] = True
                         self.taskQueue.put(request)
                     else:
                         # Respond immediately from cache
-                        logger.info(f"{myname} {tag}: {name} ({len(info):,d} B)")
-                        send(clientSocket, info)
+                        logger.info(f"{myname} {tag}: {name} ({len(blob):,d} B)")
+                        send(clientSocket, blob)
                         self.tasked[fileno] = False
                 elif "stats" in request:
                     send(clientSocket, str(cache.size()).encode())

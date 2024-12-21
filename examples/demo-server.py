@@ -1,6 +1,12 @@
 import os
+import sys
 import time
 import logging
+
+srcDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"))
+if os.path.exists(srcDir):
+    print(f"Inserting {srcDir} into sys.path")
+    sys.path.insert(0, srcDir)
 
 import radar
 
