@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import logging
 import tarfile
 import datetime
@@ -490,3 +489,8 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
 
 def pprint(obj):
     return sweep_printer.pprint(obj)
+
+
+def set_logger(new_logger):
+    global logger
+    logger = new_logger

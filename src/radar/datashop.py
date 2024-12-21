@@ -134,12 +134,12 @@ def main():
     logfile = args.logfile or config.get("logfile", "datashop.log")
     # Add FileHandler to always log INFO and above to a file
     file_handler = logging.FileHandler(logfile)
-    file_handler.setFormatter(radar.logFormatter)
+    file_handler.setFormatter(radar.log_formatter)
     logger.addHandler(file_handler)
     # Add StreamHandler to log to console when verbose > 0
     if args.verbose:
         stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(radar.logFormatter)
+        stream_handler.setFormatter(radar.log_formatter)
         logger.addHandler(stream_handler)
     # Set logger level to INFO by default
     if args.verbose > 1:

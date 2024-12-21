@@ -37,10 +37,10 @@ def request(client, file):
 ###
 
 fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-client.log"))
-fileHandler.setFormatter(radar.logFormatter)
+fileHandler.setFormatter(radar.log_formatter)
 logger.addHandler(fileHandler)
 streamHandler = logging.StreamHandler()
-streamHandler.setFormatter(radar.logFormatter)
+streamHandler.setFormatter(radar.log_formatter)
 logger.addHandler(streamHandler)
 logger.setLevel(logging.INFO)
 
