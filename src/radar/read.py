@@ -7,55 +7,18 @@ import datetime
 import threading
 import numpy as np
 
-np.set_printoptions(precision=2, suppress=True, threshold=10)
-
 from netCDF4 import Dataset
 
+from .common import *
 from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
-logger = None
+np.set_printoptions(precision=2, suppress=True, threshold=10)
+
+logger = Logger("radar-data")
 
 dot_colors = ["black", "gray", "blue", "green", "orange"]
-
-re_2parts = re.compile(
-    r"(?P<name>.+)-(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-)
-re_3parts = re.compile(
-    r"(?P<name>.+)-"
-    + r"(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-    + r"(?P<scan>([EA][0-9]+\.[0-9]|N[0-9]+))"
-)
-re_4parts = re.compile(
-    r"(?P<name>.+)-"
-    + r"(?P<time>20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9])-"
-    + r"(?P<scan>([EA][0-9]+\.[0-9]|N[0-9]+))-"
-    + r"(?P<symbol>[A-Za-z0-9]+)"
-)
-re_cf_version = re.compile(r"(CF|Cf|cf).+-(?P<version>[0-9]+\.[0-9]+)")
-re_datetime_a = re.compile(r"(?<=-)20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9].[0-9]+")
-re_datetime_b = re.compile(r"(?<=-)20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9]")
-re_datetime_f = re.compile(r"20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9].[0-9]+")
-re_datetime_s = re.compile(r"20[0-9][0-9](0[0-9]|1[012])([0-2][0-9]|3[01])-([01][0-9]|2[0-3])[0-5][0-9][0-5][0-9]")
-
-empty_sweep = {
-    "kind": "U",
-    "txrx": "M",
-    "symbol": "U",
-    "time": 1369071296.0,
-    "latitude": 35.25527,
-    "longitude": -97.422413,
-    "sweepElevation": 0.5,
-    "sweepAzimuth": 42.0,
-    "gatewidth": 15.0,
-    "waveform": "s0",
-    "prf": 1000.0,
-    "elevations": np.empty((0, 0), dtype=np.float32),
-    "azimuths": np.empty((0, 0), dtype=np.float32),
-    "values": {"U": np.empty((0, 0), dtype=np.float32)},
-    "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
-}
 
 sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
 
@@ -111,7 +74,7 @@ def val2ind(v, symbol="Z"):
     return np.nan_to_num(np.clip(np.round(u8), 1.0, 255.0), copy=False).astype(np.uint8)
 
 
-def starts_with_cf(string):
+def _starts_with_cf(string):
     return bool(re.match(r"^cf", string, re.IGNORECASE))
 
 
@@ -121,10 +84,12 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if verbose > 2:
         logger.debug(attrs)
     # CF-Radial format contains "Conventions" and "version"
-    if "Conventions" in attrs and starts_with_cf(ncid.getncattr("Conventions")):
+    if "Conventions" in attrs and _starts_with_cf(ncid.getncattr("Conventions")):
         conventions = ncid.getncattr("Conventions")
         subConventions = ncid.getncattr("Sub_conventions") if "Sub_conventions" in attrs else None
         version = ncid.getncattr("version") if "version" in attrs else None
+        if version is None:
+            raise ValueError(f"{myname} No version found")
         if verbose:
             logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
@@ -525,20 +490,3 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
 
 def pprint(obj):
     return sweep_printer.pprint(obj)
-
-
-def initLogger():
-    global logger
-    prog = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-    logger = Logger(prog if prog else "radar-data")
-    return logger
-
-
-def setLogger(newLogger):
-    global logger
-    logger = newLogger
-
-
-##
-
-initLogger()
