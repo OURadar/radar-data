@@ -102,13 +102,11 @@ def main():
     parser.add_argument("-c", "--count", type=int, default=None, help="count")
     parser.add_argument("-d", "--dir", type=str, default=None, help="directory")
     parser.add_argument("-H", "--host", type=str, default=None, help="host")
-    parser.add_argument("-l", "--logfile", type=str, default=None, help="log file")
     parser.add_argument("-p", "--port", type=int, default=None, help="port")
     parser.add_argument("-t", "--test", type=str, help="test using directory")
     parser.add_argument("-v", dest="verbose", default=0, action="count", help="increases verbosity")
     parser.add_argument("--delay", action="store_true", help="simulate request delays")
     parser.add_argument("--version", action="version", version="%(prog)s " + radar.__version__)
-    parser.add_argument("--no-log", action="store_true", help="do not log to file")
     args = parser.parse_args()
 
     # Set the process title for easy identification
@@ -130,22 +128,8 @@ def main():
     else:
         config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000}
 
-    # Logfile from configuration, override by command line
-    logfile = args.logfile or config.get("logfile", "datashop.log")
-    # Add FileHandler to always log INFO and above to a file
-    file_handler = logging.FileHandler(logfile)
-    file_handler.setFormatter(radar.log_formatter)
-    logger.addHandler(file_handler)
-    # Add StreamHandler to log to console when verbose > 0
-    if args.verbose:
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(radar.log_formatter)
-        logger.addHandler(stream_handler)
     # Set logger level to INFO by default
-    if args.verbose > 1:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
+    logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose > 1 else logging.INFO)
 
     logger.info(f"Datashop {radar.__version__}")
 

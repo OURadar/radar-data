@@ -199,4 +199,5 @@ ignore = colorize("✓", "yellow")
 missing = colorize("✗", "orange")
 processed = colorize("✓✓", "green")
 
-log_formatter = logging.Formatter("%(asctime)s - %(levelname)-7s - %(message)s")
+log_format = "%(asctime)s - %(levelname)-7s - %(message)s"
+log_formatter = logging.Formatter(log_format)

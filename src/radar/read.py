@@ -61,7 +61,7 @@ def val2ind(v, symbol="Z"):
     elif symbol == "D":
         u8 = v * 10.0 + 100.0
     elif symbol == "P":
-        u8 = v * 128.0 / np.pi + 128.0
+        u8 = v * 128.0 / 180.0 + 128.0
     elif symbol == "R":
         u8 = rho2ind(v)
     elif symbol == "I":
