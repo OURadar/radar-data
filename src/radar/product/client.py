@@ -67,6 +67,7 @@ class Client(Manager):
                     sock.close()
                 self._shallow_sleep(2.5)
                 continue
+            logger.info(f"{myname} Connected to {self._host}:{self._port}")
             # Keep running until told to stop
             ping = 0
             while self.wantActive:
