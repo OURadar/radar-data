@@ -150,7 +150,7 @@ def main():
         sys.exit(0)
 
     # Start the server
-    server = radar.product.Server(logger=logger, **config)
+    server = radar.product.Server(logger=logger, signal=True, **config)
     server.start()
 
     if is_foreground():

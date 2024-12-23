@@ -105,6 +105,8 @@ class Client(Manager):
     def get(self, path, tarinfo=None, want_tarinfo=False):
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
+            if want_tarinfo:
+                return None, None
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
