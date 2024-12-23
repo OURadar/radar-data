@@ -45,7 +45,7 @@ class Manager:
         self.verbose = kwargs.get("verbose", 0)
         self.wakeUp = False
         self.wantActive = True
-        if kwargs.get("signal", True):
+        if kwargs.get("signal", False):
             self._originalSigIntHandler = signal.getsignal(signal.SIGINT)
             self._originalSigTermHandler = signal.getsignal(signal.SIGTERM)
             signal.signal(signal.SIGINT, self._signalHandler)
