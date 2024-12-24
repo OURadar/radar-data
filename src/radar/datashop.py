@@ -126,10 +126,12 @@ def main():
             logger.error(f"Unsupported configuration {config_ext}")
             sys.exit(1)
     else:
-        config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000}
+        config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000, "utc": True}
 
     # Set logger level to INFO by default
     logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose > 1 else logging.INFO)
+    if config.get("utc", False):
+        logging.Formatter.converter = time.gmtime
 
     logger.info(f"Datashop {radar.__version__}")
 
