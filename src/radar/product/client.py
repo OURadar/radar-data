@@ -143,7 +143,7 @@ class Client(Manager):
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
-            sock.settimeout(5.0)
+            sock.settimeout(2.5)
             send(sock, json.dumps({"stats": 1}).encode())
             message = recv(sock)
             if message is None:
@@ -152,14 +152,14 @@ class Client(Manager):
                 return None
         return message.decode("utf-8")
 
-    def custom(self, command, **kwargs):
+    def execute(self, command, **kwargs):
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
-            sock.settimeout(5.0)
-            payload = json.dumps({"custom": command, **kwargs}).encode()
+            sock.settimeout(2.5)
+            payload = json.dumps({"execute": command, **kwargs}).encode()
             send(sock, payload)
             message = recv(sock)
             if command == "list":

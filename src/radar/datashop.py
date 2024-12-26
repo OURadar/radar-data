@@ -60,9 +60,9 @@ def test(**kwargs):
     fifo = radar.FIFOBuffer()
     tic = time.time()
 
-    files = client.custom("list", folder=folder)
+    files = client.execute("list", folder=folder)
 
-    for file in files[-200:-100] if len(files) > 200 else files[:100]:
+    for file in files:
         req = threading.Thread(target=request, args=(client, file, verbose))
         req.start()
         fifo.enqueue(req)

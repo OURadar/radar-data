@@ -46,7 +46,7 @@ class Conceirge:
         while self._parent.wantActive:
             # Input / incoming requests
             try:
-                sock.settimeout(0.1)
+                sock.settimeout(0.05)
                 request = recv(sock)
                 if not request:
                     logger.debug(f"{myname} Client disconnected")
@@ -70,10 +70,12 @@ class Conceirge:
                         send(sock, blob)
                 elif "stats" in request:
                     send(sock, str(cache.size()).encode())
-                elif "custom" in request:
-                    command = request["custom"]
-                    if command == "list" and "folder" in request:
-                        files = sorted(glob.glob(os.path.join(request["folder"], "[A-Za-z0-9]*z")))
+                elif "execute" in request:
+                    command = request["execute"]
+                    folder = request.get("folder", None)
+                    if command == "list" and folder:
+                        logger.info(f"{myname} Listing folder {folder}")
+                        files = sorted(glob.glob(os.path.join(folder, "[A-Za-z0-9]*z")))
                         payload = json.dumps(files).encode()
                         send(sock, payload)
                     else:
@@ -81,7 +83,8 @@ class Conceirge:
                 else:
                     logger.warning(f"{myname} Unknown request")
             except TimeoutError:
-                pass
+                if self._parent.wantActive:
+                    time.sleep(0.05)
             except Exception as e:
                 logger.error(f"{myname} {e}")
                 break
@@ -89,7 +92,7 @@ class Conceirge:
             if not self.busy:
                 continue
             try:
-                result = outQueue.get(timeout=0.1)
+                result = outQueue.get(timeout=0.05)
                 fileno = result["fileno"]
                 if fileno != self._fileno:
                     logger.warning(f"{myname} Client {fileno} mismatch")
@@ -104,7 +107,8 @@ class Conceirge:
                 logger.info(f"{myname} {driveTag}: {name} ({len(blob):,d} B)")
                 result.task_done()
             except:
-                pass
+                if self._parent.wantActive:
+                    time.sleep(0.05)
 
         sock.close()
         with self._parent.lock:
@@ -157,11 +161,11 @@ class Server(Manager):
         self.mpLock = mp.Lock()
         self.mpWantActive = mp.Value("i", 0)
         self.jobQueue = mp.Queue()  # Request queue for readers to pick up
-        self.rawQueue = mp.Queue()  # Data queue for readers to put data
-        self.outQueue = {}  # Output queue for concierges to get data to deliver
+        self.midQueue = mp.Queue()  # Middle data queue for readers to put data
+        self.outQueue = {}  # Output queue for concierges to get data to deliver, fileno as key
         self.workers = []
         for k in range(self.count):
-            w = mp.Process(target=_reader, args=(k, self.jobQueue, self.rawQueue, self.mpLock, self.mpWantActive))
+            w = mp.Process(target=_reader, args=(k, self.jobQueue, self.midQueue, self.mpLock, self.mpWantActive))
             self.workers.append(w)
         # Threading
         self.connectorThread = threading.Thread(target=self._connector)
@@ -173,13 +177,15 @@ class Server(Manager):
         sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sd.bind((self._host, self._port))
-        sd.settimeout(0.25)
+        sd.settimeout(0.05)
         sd.listen(32)
         logger.info(f"{myname} Started")
         while self.wantActive:
             try:
                 cd, addr = sd.accept()
             except socket.timeout:
+                if self.wantActive:
+                    time.sleep(0.05)
                 continue
             except Exception as e:
                 logger.warning(f"{myname} Socket accept failed {e}")
@@ -198,7 +204,7 @@ class Server(Manager):
         logger.info(f"{myname} Started")
         while self.wantActive:
             try:
-                result = self.rawQueue.get(timeout=0.05)
+                result = self.midQueue.get(timeout=0.05)
                 fileno = result["fileno"]
                 if fileno not in self.outQueue:
                     logger.warning(f"{myname} Client {fileno} not found")
