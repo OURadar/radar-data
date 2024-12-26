@@ -9,6 +9,8 @@ import socket
 import threading
 import multiprocess as mp
 
+# import multiprocessing as mp
+
 from setproctitle import setproctitle, getproctitle
 
 from .share import *
@@ -16,150 +18,158 @@ from ..cosmetics import colorize, pretty_object_name
 from ..lrucache import LRUCache
 
 
-cache = None
 logger = None
 
 
-# Each worker is a separate process because data reader is not thread safe (limitation of HDF5)
-
-# - _connector runs a single thread to accept incoming connections
-# - _concierge runs a single thread to handle a client connection
-# - _reader runs multiple processes to read data from disk
-# - _publisher runs multiple threads to send data to clients
+# Each reader is a separate process because data reader is not thread safe (limitation of HDF5)
 
 
-class Server(Manager):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.name = colorize("Server", "green")
-        self._host = kwargs.get("host", "0.0.0.0")
-        global cache, logger
-        cache = LRUCache(kwargs.get("cache", 1000))
-        logger = self.logger
-        # Wire things up
-        self.clients = {}
-        self.tasked = {}
-        self.mpLock = mp.Lock()
-        self.taskQueue = mp.Queue()
-        self.dataQueue = mp.Queue()
-        self.readerRun = mp.Value("i", 0)
-        self.readerThreads = []
-        for k in range(self.count):
-            worker = mp.Process(target=self._reader, args=(k,))
-            self.readerThreads.append(worker)
-        self.publisherThreads = []
-        for k in range(clamp(self.count // 2, 1, 2)):
-            worker = threading.Thread(target=self._publisher, args=(k,))
-            self.publisherThreads.append(worker)
-        self.connectorThread = threading.Thread(target=self._listen)
-        logger.info(pretty_object_name("Server", self._host, self._port))
+class Conceirge:
+    busy = False
 
-    def _reader(self, id):
-        myname = pretty_object_name("Server.reader", f"{id:02d}")
-        setproctitle(f"{getproctitle()} # reader[{id}]")
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
-        with self.mpLock:
-            self.readerRun.value += 1
-        logger.info(f"{myname} Started")
-        while self.readerRun.value:
+    def __init__(self, parent, fileno, **kwargs):
+        self._parent = parent
+        self._fileno = fileno
+        self._addr = kwargs.get("addr", "0.0.0.0")
+
+    def _runloop(self):
+        sock = self._parent.clients[self._fileno]
+        outQueue = self._parent.outQueue[self._fileno]
+        jobQueue = self._parent.jobQueue
+        cache = self._parent.cache
+        myname = pretty_object_name("Server.concierge", self._fileno)
+        cacheTag = colorize("Cache", "orange")
+        driveTag = colorize("Drive", "skyblue")
+
+        logger.info(f"{myname} Started for {self._addr[0]}:{self._addr[1]}")
+
+        while self._parent.wantActive:
+            # Input / incoming requests
             try:
-                request = self.taskQueue.get(timeout=0.05)
-                if request is None or "path" not in request:
-                    logger.info(f"{myname} No request")
-                    continue
-                tarinfo = request.get("tarinfo", None)
-                fileno = request["fileno"]
-                path = request["path"]
-                data, tarinfo = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
-                blob = pickle.dumps({"data": data, "tarinfo": tarinfo})
-                self.dataQueue.put({"fileno": fileno, "path": path, "blob": blob})
-                request.task_done()
-            except:
+                sock.settimeout(0.1)
+                request = recv(sock)
+                if not request:
+                    logger.debug(f"{myname} Client disconnected")
+                    break
+                request = json.loads(request)
+                logger.debug(f"{myname} {request}")
+                sock.settimeout(2.5)
+                if "ping" in request:
+                    send(sock, json.dumps({"pong": request["ping"]}).encode())
+                elif "path" in request:
+                    name = os.path.basename(request["path"])
+                    logger.info(f"{myname} Sweep: {name}")
+                    blob = cache.get(name)
+                    if blob is None:
+                        # Queue it up for reader. Collector will put it in outQueue when ready
+                        jobQueue.put({"fileno": self._fileno, "path": request["path"]})
+                        self.busy = True
+                    else:
+                        # Respond with cached data
+                        logger.info(f"{myname} {cacheTag}: {name} ({len(blob):,d} B)")
+                        send(sock, blob)
+                elif "stats" in request:
+                    send(sock, str(cache.size()).encode())
+                elif "custom" in request:
+                    command = request["custom"]
+                    if command == "list" and "folder" in request:
+                        files = sorted(glob.glob(os.path.join(request["folder"], "[A-Za-z0-9]*z")))
+                        payload = json.dumps(files).encode()
+                        send(sock, payload)
+                    else:
+                        logger.debug(f"{myname} Unable to process custom request")
+                else:
+                    logger.warning(f"{myname} Unknown request")
+            except TimeoutError:
                 pass
-        logger.info(f"{myname} Stopped")
-
-    def _publisher(self, id):
-        myname = pretty_object_name("Server.publisher", f"{id:02d}")
-        logger.info(f"{myname} Started")
-        tag = colorize("Drive", "skyblue")
-        while self.wantActive:
+            except Exception as e:
+                logger.error(f"{myname} {e}")
+                break
+            # Ouput / data delivery
+            if not self.busy:
+                continue
             try:
-                result = self.dataQueue.get(timeout=0.05)
+                result = outQueue.get(timeout=0.1)
                 fileno = result["fileno"]
-                if fileno not in self.clients:
-                    logger.warning(f"{myname} Client {fileno} not found")
+                if fileno != self._fileno:
+                    logger.warning(f"{myname} Client {fileno} mismatch")
                     continue
-                sock = self.clients[fileno]
                 # Use basname to as key to cache
                 name = os.path.basename(result["path"])
                 blob = result["blob"]
                 cache.put(name, blob)
                 sock.settimeout(2.5)
                 send(sock, blob)
-                logger.info(f"{myname} {tag}: {name} ({len(blob):,d} B) <{fileno}>")
-                self.tasked[fileno] = False
+                self.busy = False
+                logger.info(f"{myname} {driveTag}: {name} ({len(blob):,d} B)")
                 result.task_done()
             except:
-                # Timeout just means there's no data to publish
                 pass
+
+        sock.close()
+        with self._parent.lock:
+            del self._parent.clients[self._fileno]
+            del self._parent.outQueue[self._fileno]
         logger.info(f"{myname} Stopped")
 
-    def _concierge(self, clientSocket):
-        fileno = clientSocket.fileno()
-        myname = pretty_object_name("Server.concierge", fileno)
-        logger.info(f"{myname} Started")
-        tag = colorize("Cache", "orange")
-        assert fileno in self.clients, f"{myname} Client {fileno} not found"
-        while self.wantActive:
-            try:
-                clientSocket.settimeout(0.1)
-                request = recv(clientSocket)
-                if not request:
-                    logger.debug(f"{myname} client disconnected")
-                    break
-                request = json.loads(request)
-                logger.debug(f"{myname} {request}")
-                if "ping" in request:
-                    send(clientSocket, json.dumps({"pong": request["ping"]}).encode())
-                elif "path" in request:
-                    name = os.path.basename(request["path"])
-                    blob = cache.get(name)
-                    logger.info(f"{myname} Sweep: {name}")
-                    if blob is None:
-                        # Queue it up for reader, and let _publisher() respond
-                        request["fileno"] = fileno
-                        self.tasked[fileno] = True
-                        self.taskQueue.put(request)
-                    else:
-                        # Respond immediately from cache
-                        logger.info(f"{myname} {tag}: {name} ({len(blob):,d} B)")
-                        send(clientSocket, blob)
-                        self.tasked[fileno] = False
-                elif "stats" in request:
-                    send(clientSocket, str(cache.size()).encode())
-                elif "custom" in request:
-                    command = request["custom"]
-                    if command == "list" and "folder" in request:
-                        files = sorted(glob.glob(os.path.join(request["folder"], "[A-Za-z0-9]*z")))
-                        payload = json.dumps(files).encode()
-                    send(clientSocket, payload)
-                else:
-                    logger.warn(f"{myname} Unknown request {request}")
-                # Wait for publisher to respond before taking another request
-                while self.tasked[fileno] and self.wantActive:
-                    time.sleep(0.05)
-            except TimeoutError:
+    def start(self):
+        threading.Thread(target=self._runloop, daemon=True).start()
+
+
+def _reader(id, workQueue, dataQueue, lock, wantActive):
+    myname = pretty_object_name("Server.reader", f"{id:02d}")
+    setproctitle(f"{getproctitle()} # reader[{id}]")
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    with lock:
+        wantActive.value += 1
+    logger.info(f"{myname} Started")
+    while wantActive.value:
+        try:
+            request = workQueue.get(timeout=0.05)
+            if request is None or "path" not in request:
+                logger.info(f"{myname} No request")
                 continue
-            except:
-                break
-        with self.lock:
-            del self.clients[fileno]
-            del self.tasked[fileno]
-        clientSocket.close()
-        logger.info(f"{myname} Stopped")
+            tarinfo = request.get("tarinfo", None)
+            fileno = request["fileno"]
+            path = request["path"]
+            data, tarinfo = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
+            blob = pickle.dumps({"data": data, "tarinfo": tarinfo})
+            dataQueue.put({"fileno": fileno, "path": path, "blob": blob})
+            request.task_done()
+        except:
+            pass
+    logger.info(f"{myname} Stopped")
 
-    def _listen(self):
-        myname = colorize("Server.listen", "green")
+
+class Server(Manager):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._host = kwargs.get("host", "0.0.0.0")
+        self.name = pretty_object_name("Server", self._host, self._port)
+        # Wire things up
+        global logger
+        logger = self.logger
+        self.cache = LRUCache(kwargs.get("cache", 1000))
+        self.clients = {}
+        # Multiprocessing.
+        # IMPORTANT: Do not share cache across processes
+        self.mpLock = mp.Lock()
+        self.mpWantActive = mp.Value("i", 0)
+        self.jobQueue = mp.Queue()  # Request queue for readers to pick up
+        self.rawQueue = mp.Queue()  # Data queue for readers to put data
+        self.outQueue = {}  # Output queue for concierges to get data to deliver
+        self.workers = []
+        for k in range(self.count):
+            w = mp.Process(target=_reader, args=(k, self.jobQueue, self.rawQueue, self.mpLock, self.mpWantActive))
+            self.workers.append(w)
+        # Threading
+        self.connectorThread = threading.Thread(target=self._connector)
+        self.collectorThread = threading.Thread(target=self._collector)
+        logger.info(self.name)
+
+    def _connector(self):
+        myname = colorize("Server.connector", "green")
         sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sd.bind((self._host, self._port))
@@ -168,29 +178,45 @@ class Server(Manager):
         logger.info(f"{myname} Started")
         while self.wantActive:
             try:
-                cd, (addr, port) = sd.accept()
+                cd, addr = sd.accept()
             except socket.timeout:
                 continue
-            except:
+            except Exception as e:
+                logger.warning(f"{myname} Socket accept failed {e}")
                 raise
             with self.lock:
                 fileno = cd.fileno()
                 self.clients[fileno] = cd
-                self.tasked[fileno] = False
-            logger.info(f"{myname} Connection from {addr}:{port} / {cd.fileno()}")
-            threading.Thread(target=self._concierge, args=(cd,)).start()
+                self.outQueue[fileno] = mp.Queue()
+                concierge = Conceirge(self, fileno, addr=addr)
+                concierge.start()
         sd.close()
+        logger.info(f"{myname} Stopped")
+
+    def _collector(self):
+        myname = colorize("Server.collector", "green")
+        logger.info(f"{myname} Started")
+        while self.wantActive:
+            try:
+                result = self.rawQueue.get(timeout=0.05)
+                fileno = result["fileno"]
+                if fileno not in self.outQueue:
+                    logger.warning(f"{myname} Client {fileno} not found")
+                    continue
+                self.outQueue[fileno].put(result)
+            except:
+                # Technically getting _queue.Empty but not in the namespace
+                pass
         logger.info(f"{myname} Stopped")
 
     def _delayStart(self, delay):
         time.sleep(delay)
-        for worker in self.readerThreads:
+        for worker in self.workers:
             worker.start()
-        while self.readerRun.value < self.count:
+        while self.mpWantActive.value < self.count:
             time.sleep(0.02)
-        for worker in self.publisherThreads:
-            worker.start()
         self.connectorThread.start()
+        self.collectorThread.start()
 
     def start(self, delay=0.1):
         self.wantActive = True
@@ -198,26 +224,21 @@ class Server(Manager):
 
     def stop(self, callback=None, args=()):
         with self.mpLock:
-            if self.readerRun.value == 0:
+            if self.mpWantActive.value == 0:
                 return 1
-            self.readerRun.value = 0
-        logger.debug(f"{self.name} Stopping readers ...")
-        for worker in self.readerThreads:
+            self.mpWantActive.value = 0
+        logger.debug(f"{self.name} Stopping ...")
+        for worker in self.workers:
             worker.join()
-        logger.debug(f"{self.name} Stopping publisher ...")
         self.wantActive = False
-        for worker in self.publisherThreads:
-            worker.join()
-        logger.debug(f"{self.name} Stopping connector ...")
-        self.connectorThread.join()
+        self.join()
         logger.info(f"{self.name} Stopped")
         super().stop(callback, args)
 
     def join(self):
-        logger.info("Waiting for all threads to join ...")
-        for worker in self.readerThreads:
-            worker.join()
-        for worker in self.publisherThreads:
+        logger.debug("Waiting for all threads to join ...")
+        for worker in self.workers:
             worker.join()
         self.connectorThread.join()
+        self.collectorThread.join()
         logger.info(f"{self.name} Joined")

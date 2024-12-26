@@ -10,6 +10,7 @@ import pprint
 import random
 import logging
 import argparse
+import datetime
 import textwrap
 import threading
 import setproctitle
@@ -26,6 +27,7 @@ if sys.version_info[:3] < (3, 8, 0):
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120)
 else:
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120, sort_dicts=False)
+tz = datetime.timezone.utc
 
 
 def is_foreground():
@@ -40,7 +42,7 @@ def request(client, file, verbose=0):
         logger.info(f"Ign: {file} ...")
         return None
     unixTime = data["time"]
-    timeString = time.strftime(r"%Y%m%d-%H%M%S", time.localtime(unixTime))
+    timeString = datetime.datetime.fromtimestamp(unixTime, tz=tz).strftime(r"%Y%m%d-%H%M%S")
     basename = os.path.basename(file)
     elements = basename.split("-")
     fileTime = f"{elements[1]}-{elements[2]}"
@@ -129,7 +131,7 @@ def main():
         config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000, "utc": True}
 
     # Set logger level to INFO by default
-    logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose > 1 else logging.INFO)
+    logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose else logging.INFO)
     if config.get("utc", False):
         logging.Formatter.converter = time.gmtime
 

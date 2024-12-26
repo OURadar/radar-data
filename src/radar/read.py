@@ -125,9 +125,9 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if timeString.endswith(r"Z"):
         timeString = timeString[:-1]
     try:
-        time = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
+        timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
     except Exception as e:
-        raise ValueError(f"Unexpected timeString = {timeString}")
+        raise ValueError(f"Unexpected timeString = {timeString}   e = {e}")
     # if "sweep_number" in ncid.variables:
     #     sweepNumber = ncid.variables["sweep_number"][:]
     #     # print(f"sweepNumber = {sweepNumber}")
@@ -179,7 +179,7 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
-        "time": time,
+        "time": timestamp,
         "latitude": latitude,
         "longitude": longitude,
         "sweepElevation": sweepElevation,
