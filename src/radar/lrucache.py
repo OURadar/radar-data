@@ -8,7 +8,9 @@ lock = threading.Lock()
 
 
 class LRUCache:
-    def __init__(self, capacity: int):
+    """A simple LRU cache using an OrderedDict."""
+
+    def __init__(self, capacity: int = 100):
         self.capacity = capacity
         self.cache = OrderedDict()
 

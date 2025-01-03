@@ -10,6 +10,7 @@ import pprint
 import random
 import logging
 import argparse
+import datetime
 import textwrap
 import threading
 import setproctitle
@@ -26,6 +27,7 @@ if sys.version_info[:3] < (3, 8, 0):
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120)
 else:
     pp = pprint.PrettyPrinter(indent=1, depth=3, width=120, sort_dicts=False)
+tz = datetime.timezone.utc
 
 
 def is_foreground():
@@ -40,7 +42,7 @@ def request(client, file, verbose=0):
         logger.info(f"Ign: {file} ...")
         return None
     unixTime = data["time"]
-    timeString = time.strftime(r"%Y%m%d-%H%M%S", time.localtime(unixTime))
+    timeString = datetime.datetime.fromtimestamp(unixTime, tz=tz).strftime(r"%Y%m%d-%H%M%S")
     basename = os.path.basename(file)
     elements = basename.split("-")
     fileTime = f"{elements[1]}-{elements[2]}"
@@ -58,9 +60,9 @@ def test(**kwargs):
     fifo = radar.FIFOBuffer()
     tic = time.time()
 
-    files = client.custom("list", folder=folder)
+    files = client.execute("list", folder=folder)
 
-    for file in files[-200:-100] if len(files) > 200 else files[:100]:
+    for file in files:
         req = threading.Thread(target=request, args=(client, file, verbose))
         req.start()
         fifo.enqueue(req)
@@ -102,13 +104,11 @@ def main():
     parser.add_argument("-c", "--count", type=int, default=None, help="count")
     parser.add_argument("-d", "--dir", type=str, default=None, help="directory")
     parser.add_argument("-H", "--host", type=str, default=None, help="host")
-    parser.add_argument("-l", "--logfile", type=str, default=None, help="log file")
     parser.add_argument("-p", "--port", type=int, default=None, help="port")
     parser.add_argument("-t", "--test", type=str, help="test using directory")
     parser.add_argument("-v", dest="verbose", default=0, action="count", help="increases verbosity")
     parser.add_argument("--delay", action="store_true", help="simulate request delays")
     parser.add_argument("--version", action="version", version="%(prog)s " + radar.__version__)
-    parser.add_argument("--no-log", action="store_true", help="do not log to file")
     args = parser.parse_args()
 
     # Set the process title for easy identification
@@ -128,24 +128,12 @@ def main():
             logger.error(f"Unsupported configuration {config_ext}")
             sys.exit(1)
     else:
-        config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000}
+        config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000, "utc": True}
 
-    # Logfile from configuration, override by command line
-    logfile = args.logfile or config.get("logfile", "datashop.log")
-    # Add FileHandler to always log INFO and above to a file
-    file_handler = logging.FileHandler(logfile)
-    file_handler.setFormatter(radar.logFormatter)
-    logger.addHandler(file_handler)
-    # Add StreamHandler to log to console when verbose > 0
-    if args.verbose:
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(radar.logFormatter)
-        logger.addHandler(stream_handler)
     # Set logger level to INFO by default
-    if args.verbose > 1:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
+    logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose else logging.INFO)
+    if config.get("utc", False):
+        logging.Formatter.converter = time.gmtime
 
     logger.info(f"Datashop {radar.__version__}")
 
@@ -166,7 +154,7 @@ def main():
         sys.exit(0)
 
     # Start the server
-    server = radar.product.Server(logger=logger, **config)
+    server = radar.product.Server(logger=logger, signal=True, **config)
     server.start()
 
     if is_foreground():

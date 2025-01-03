@@ -67,6 +67,7 @@ class Client(Manager):
                     sock.close()
                 self._shallow_sleep(2.5)
                 continue
+            logger.info(f"{myname} Connected to {self._host}:{self._port}")
             # Keep running until told to stop
             ping = 0
             while self.wantActive:
@@ -82,14 +83,14 @@ class Client(Manager):
                             pong = None
                             break
                         except Exception as e:
-                            logger.warning(f"{myname} socket[{k}] unexpected error during send() {e}")
-                            data = None
+                            logger.warning(f"{myname} socket[{k}] unexpected error during ping.send() {e}")
+                            pong = None
                         try:
                             pong = recv(sock)
                         except ConnectionResetError:
                             pong = None
-                        except:
-                            logger.warning(f"{myname} sockets[{k}] unexpected error during ping.recv()")
+                        except Exception as e:
+                            logger.warning(f"{myname} sockets[{k}] unexpected error during ping.recv() {e}")
                             pong = None
                     if pong is None:
                         logger.info(f"{myname} sockets[{k}] server not available")
@@ -104,26 +105,32 @@ class Client(Manager):
     def get(self, path, tarinfo=None, want_tarinfo=False):
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
+            if want_tarinfo:
+                return None, None
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
             sock.settimeout(5.0)
             try:
                 send(sock, json.dumps({"path": path, "tarinfo": tarinfo}).encode())
-                info = recv(sock)
+                blob = recv(sock)
             except BrokenPipeError:
                 myname = pretty_object_name("Client.get", sock.fileno())
                 logger.warning(f"{myname} BrokenPipeError")
-                info = None
-        if info is None:
+                blob = None
+        if blob is None:
             myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} Server not available")
             self.wakeUp = True
+            if want_tarinfo:
+                return None, None
             return None
-        output = pickle.loads(info)
+        output = pickle.loads(blob)
         if output is None:
             myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} No output")
+            if want_tarinfo:
+                return None, None
             return None
         data, new_tarinfo = output["data"], output["tarinfo"]
         if want_tarinfo:
@@ -136,7 +143,7 @@ class Client(Manager):
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
-            sock.settimeout(5.0)
+            sock.settimeout(2.5)
             send(sock, json.dumps({"stats": 1}).encode())
             message = recv(sock)
             if message is None:
@@ -145,14 +152,14 @@ class Client(Manager):
                 return None
         return message.decode("utf-8")
 
-    def custom(self, command, **kwargs):
+    def execute(self, command, **kwargs):
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
             return None
         sock, lock = self._getSocketAndLock()
         with lock:
-            sock.settimeout(5.0)
-            payload = json.dumps({"custom": command, **kwargs}).encode()
+            sock.settimeout(2.5)
+            payload = json.dumps({"execute": command, **kwargs}).encode()
             send(sock, payload)
             message = recv(sock)
             if command == "list":

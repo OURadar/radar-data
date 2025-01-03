@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import logging
 import tarfile
 import datetime
@@ -14,17 +13,15 @@ from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
 from .nexrad import get_nexrad_location
 
+_lock = threading.Lock()
+
 np.set_printoptions(precision=2, suppress=True, threshold=10)
 
-logger = Logger("radar-data")
-
-dot_colors = ["black", "gray", "blue", "green", "orange"]
-
-sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
-
 sep = colorize("/", "orange")
-
-_lock = threading.Lock()
+dot_colors = ["black", "gray", "blue", "green", "orange"]
+sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
+tzinfo = datetime.timezone.utc
+logger = Logger("radar-data")
 
 
 class Kind:
@@ -62,7 +59,7 @@ def val2ind(v, symbol="Z"):
     elif symbol == "D":
         u8 = v * 10.0 + 100.0
     elif symbol == "P":
-        u8 = v * 128.0 / np.pi + 128.0
+        u8 = v * 128.0 / 180.0 + 128.0
     elif symbol == "R":
         u8 = rho2ind(v)
     elif symbol == "I":
@@ -97,12 +94,12 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
             m = m.groupdict()
             versionNumber = m["version"]
             if versionNumber >= "2.0":
-                return _read_cf2_from_nc(ncid, symbols=symbols)
-            return _read_cf1_from_nc(ncid, symbols=symbols)
+                return _read_cf2_from_ncid(ncid, symbols=symbols)
+            return _read_cf1_from_ncid(ncid, symbols=symbols)
         elif version >= "2":
-            return _read_cf2_from_nc(ncid, symbols=symbols)
+            return _read_cf2_from_ncid(ncid, symbols=symbols)
         elif version[0] == "1":
-            return _read_cf1_from_nc(ncid, symbols=symbols)
+            return _read_cf1_from_ncid(ncid, symbols=symbols)
         show = f"{myname} {version} {sep} {conventions} {sep} {subConventions}"
         raise ValueError(f"{myname} Unsupported format {show}")
     # WDSS-II format contains "TypeName" and "DataType"
@@ -110,12 +107,12 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         if verbose:
             createdBy = ncid.getncattr("CreatedBy")
             logger.info(f"{myname} WDSS-II {sep} {createdBy}")
-        return _read_wds_from_nc(ncid)
+        return _read_wds_from_ncid(ncid)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
 
 
-def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
+def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     longitude = float(ncid.variables["longitude"][0])
     latitude = float(ncid.variables["latitude"][0])
     attrs = ncid.ncattrs()
@@ -127,12 +124,10 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         raise ValueError("No time_coverage_start")
     if timeString.endswith(r"Z"):
         timeString = timeString[:-1]
-    if len(timeString) == 19:
-        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
-    elif len(timeString) > 19:
-        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
-    else:
-        raise ValueError(f"Unexpected timeString = {timeString}")
+    try:
+        timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
+    except Exception as e:
+        raise ValueError(f"Unexpected timeString = {timeString}   e = {e}")
     # if "sweep_number" in ncid.variables:
     #     sweepNumber = ncid.variables["sweep_number"][:]
     #     # print(f"sweepNumber = {sweepNumber}")
@@ -184,7 +179,7 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
-        "time": time,
+        "time": timestamp,
         "latitude": latitude,
         "longitude": longitude,
         "sweepElevation": sweepElevation,
@@ -200,7 +195,7 @@ def _read_cf1_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
 
 
 # TODO: Need to make this more generic
-def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
+def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     site = ncid.getncattr("instrument_name")
     location = get_nexrad_location(site)
     if location:
@@ -212,12 +207,10 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     timeString = ncid.getncattr("start_time")
     if timeString.endswith("Z"):
         timeString = timeString[:-1]
-    if "." in timeString:
-        myname = colorize("radar._read_cf2_from_nc()", "green")
-        logger.debug(f"{myname} CF2 timeString = {timeString}")
-        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S.%f").timestamp()
-    else:
-        time = datetime.datetime.strptime(timeString, r"%Y-%m-%dT%H:%M:%S").timestamp()
+    try:
+        time = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
+    except Exception as e:
+        raise ValueError(f"Unexpected timeString = {timeString} {e}")
     variables = ncid.groups["sweep_0001"].variables
     sweepMode = variables["sweep_mode"][:]
     fixedAngle = float(variables["fixed_angle"][:])
@@ -266,7 +259,7 @@ def _read_cf2_from_nc(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     }
 
 
-def _read_wds_from_nc(ncid):
+def _read_wds_from_ncid(ncid):
     name = ncid.getncattr("TypeName")
     attrs = ncid.ncattrs()
     elevations = np.array(ncid.variables["Elevation"][:], dtype=np.float32)
@@ -490,3 +483,8 @@ def read(source, symbols=None, tarinfo=None, want_tarinfo=False, finite=False, u
 
 def pprint(obj):
     return sweep_printer.pprint(obj)
+
+
+def set_logger(new_logger):
+    global logger
+    logger = new_logger

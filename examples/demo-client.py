@@ -1,9 +1,15 @@
 import os
+import sys
 import glob
 import time
 import random
 import logging
 import threading
+
+srcDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"))
+if os.path.exists(srcDir):
+    print(f"Inserting {srcDir} into sys.path")
+    sys.path.insert(0, srcDir)
 
 import radar
 
@@ -31,10 +37,10 @@ def request(client, file):
 ###
 
 fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-client.log"))
-fileHandler.setFormatter(radar.logFormatter)
+fileHandler.setFormatter(radar.log_formatter)
 logger.addHandler(fileHandler)
 streamHandler = logging.StreamHandler()
-streamHandler.setFormatter(radar.logFormatter)
+streamHandler.setFormatter(radar.log_formatter)
 logger.addHandler(streamHandler)
 logger.setLevel(logging.INFO)
 
