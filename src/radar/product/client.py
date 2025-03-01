@@ -108,22 +108,16 @@ class Client(Manager):
             if want_tarinfo:
                 return None, None
             return None
-        sock, lock = self._getSocketAndLock()
         myname = pretty_object_name("Client.get", sock.fileno())
+        sock, lock = self._getSocketAndLock()
         with lock:
             sock.settimeout(5.0)
             try:
                 send(sock, json.dumps({"path": path, "tarinfo": tarinfo}).encode())
-            except BrokenPipeError:
-                logger.warning(f"{myname} BrokenPipeError")
-                return None, None
-            try:
                 blob = recv(sock)
-            except:
-                logger.warning(f"{myname} No blob")
-                if want_tarinfo:
-                    return None, None
-                return None
+            except Exception as e:
+                logger.warning(f"{myname} {e}")
+                blob = None
         if blob is None:
             logger.error(f"{myname} Server not available")
             self.wakeUp = True
