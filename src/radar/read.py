@@ -11,7 +11,7 @@ from netCDF4 import Dataset
 from .common import *
 from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
-from .nexrad import get_nexrad_location
+from .nexrad import get_nexrad_location, get_vcp_msg31_timestamp, is_nexrad_bz2
 
 _lock = threading.Lock()
 
@@ -28,6 +28,7 @@ class Kind:
     UNK = "U"
     CF1 = "1"
     CF2 = "2"
+    M31 = "31"
     WDS = "W"
 
 
@@ -412,6 +413,65 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     return sweep
 
 
+def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
+    myname = colorize("radar._read_nexrad()", "green")
+    logger.info(f"{myname} {colorize(source, 'yellow')}")
+
+    vcp, msg31, timestamp = get_vcp_msg31_timestamp(source)
+
+    nrays = len(msg31)
+    data = msg31[0].data
+    products = {"REF", "VEL", "SW", "ZDR", "PHI", "RHO"} & set(data.keys())
+    max_gates = min([data[p].ngates for p in products])
+    r0 = data["REF"].r0
+    dr = data["REF"].dr
+    rr = np.arange(r0, r0 + max_gates * dr, dr)
+    ee = np.zeros(nrays, ">f4")
+    aa = np.zeros(nrays, ">f4")
+    days = np.zeros(nrays, ">i4")
+    secs = np.zeros(nrays, ">i4")
+    for k, msg in enumerate(msg31):
+        data_header = msg.head
+        ee[k] = data_header.elevation_angle
+        aa[k] = data_header.azimuth_angle
+        days[k] = data_header.timestamp
+        secs[k] = data_header.timestamp_ms
+    # Assemble the products
+    arrays = {}
+    for symbol in products:
+        ngates = data[symbol].ngates
+        values = np.zeros((nrays, ngates), dtype="H" if data[symbol].word_size == 16 else "B")
+        offset = np.float32(data[symbol].offset)
+        scale = np.float32(data[symbol].scale)
+        for k, msg in enumerate(msg31):
+            values[k, :] = msg.data[symbol].values
+        mask = values <= 1
+        values = (values - offset) / scale
+        arrays[symbol] = np.ma.array(values[:, :max_gates], mask=mask[:, :max_gates])
+    # Replace keys: REF -> Z, VEL -> V, SW -> W, ZDR -> D, PHI -> P, RHO -> R
+    products = (
+        {"Z": arrays["REF"], "D": arrays["ZDR"], "P": arrays["PHI"], "R": arrays["RHO"]}
+        if ("ZDR" in arrays)
+        else {"Z": arrays["REF"], "V": arrays["VEL"], "W": arrays["SW"]}
+    )
+    return {
+        "kind": Kind.M31,
+        "txrx": TxRx.MONOSTATIC,
+        "time": timestamp,
+        "latitude": data["VOL"].latitude,
+        "longitude": data["VOL"].longitude,
+        "sweepElevation": vcp.data[sweep_index].elevation_angle,
+        "sweepAzimuth": 0.0,
+        "prf": msg31[0].prf,
+        "waveform": "u",
+        "gatewidth": data["REF"].dr,
+        "elevations": ee,
+        "azimuths": aa,
+        "ranges": rr,
+        "products": products,
+    }
+
+
 def read_tarinfo(source, verbose=0):
     tarinfo = {}
     try:
@@ -483,6 +543,10 @@ def read(source, **kwargs):
             data = output
     elif ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
+        tarinfo = {}
+    elif is_nexrad_bz2(source):
+        sweep_index = kwargs.get("sweep_index", 0)
+        data = _read_nexrad(source, sweep_index=sweep_index, symbols=symbols, verbose=verbose)
         tarinfo = {}
     else:
         raise ValueError(f"{myname} Unsupported file extension {ext}")

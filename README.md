@@ -9,6 +9,7 @@ These formats are currently supported
 - CF-Radial 1.4 / CF-1.6
 - CF-Radial 1.4 / CF-1.7
 - CF-Radial 2.0 (draft)
+- NEXRAD Level II
 
 ## Install Using the Python Package-Management System
 
