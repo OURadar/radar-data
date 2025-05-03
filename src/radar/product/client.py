@@ -108,18 +108,17 @@ class Client(Manager):
             if want_tarinfo:
                 return None, None
             return None
+        myname = pretty_object_name("Client.get", sock.fileno())
         sock, lock = self._getSocketAndLock()
         with lock:
             sock.settimeout(5.0)
             try:
                 send(sock, json.dumps({"path": path, "tarinfo": tarinfo}).encode())
                 blob = recv(sock)
-            except BrokenPipeError:
-                myname = pretty_object_name("Client.get", sock.fileno())
-                logger.warning(f"{myname} BrokenPipeError")
+            except Exception as e:
+                logger.warning(f"{myname} {e}")
                 blob = None
         if blob is None:
-            myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} Server not available")
             self.wakeUp = True
             if want_tarinfo:
@@ -127,7 +126,6 @@ class Client(Manager):
             return None
         output = pickle.loads(blob)
         if output is None:
-            myname = pretty_object_name("Client.get", sock.fileno())
             logger.error(f"{myname} No output")
             if want_tarinfo:
                 return None, None
