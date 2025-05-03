@@ -1,6 +1,6 @@
 """
 -------------------------------------------------------------------------
-                          Volume Header Record
+                           Volume Header Record
 A 24-byte record that is described in Figure 1. This record will contain
 the volume number along with a date and time field.
 .........................................................................
@@ -8,21 +8,21 @@ the volume number along with a date and time field.
 A record that is bzip2 compressed. It consists of Metadata message types
 15, 13, 18, 3, 5, and 2. See section 7.3.5.
 
-                (These two records are in the -S file)
+                 (These two records are in the *-S file)
 -------------------------------------------------------------------------
-                        LDM Compressed Record
+                          LDM Compressed Record
 A variable size record that is bzip2 compressed. It consists of 120 radial
 data messages (type 1 or 31) plus 0 or more RDA Status messages (type
-2). The last message will have a radial status signaling “end of
-elevation” or “end of volume”. See paragraph 7.3.4.
+2). The last message will have a radial status signaling "end of
+elevation" or "end of volume". See paragraph 7.3.4.
                      (This record is in a -I file)
 -------------------------------------------------------------------------
                       Repeat (LDM Compressed Record)
                                   Or
-                  End of File (for end of volume data)
+                   End of File (for end of volume data)
 
-                     (This record is in a -I file)
-                     (Last record is in a -S file)
+                      (This record is in a *-I file)
+                      (Last record is in a *-E file)
 --------------------------------------------------------------------------
 
 Modified from Figure 2 in NEXRAD Interface Control Document 2620010E
@@ -38,13 +38,35 @@ import datetime
 import urllib.request
 import numpy as np
 
-BZIP_HEADER_SIZE = 12
+# The first 12 bytes are empty, which means the "Message Size" does not begin until byte 13
+EMPTY_BYTE_COUNT = 12
+
+# A 24-byte record that is described in Figure 1
 VOLUME_HEADER_SIZE = 24
+
+# The structure of the LDM Compressed Record is a 4-byte, big-endian, signed binary control word
 LDM_CONTROL_WORD_SIZE = 4
+
+# It contains the number of 2432 byte message segments set aside for each message type ...
 METADATA_RECORD_SIZE = 2432
+
+# The size of the uncompressed metadata is fixed at 134 messages, ie. 325888 bytes
+# Message Type 15, 77 segments
+# Message Type 13, 49 segments
+# Message Type 18, 5 segment
+# Message Type 3, 1 segment
+# Message Type 5, 1 segment
+# Message Type 2, 1 segment
+META_DATA_SIZE = 325888
+MESSAGE_5_OFFSET = EMPTY_BYTE_COUNT + META_DATA_SIZE - 2 * METADATA_RECORD_SIZE
+
+# Metadata Record is a variable number of compressed records containing 120 radial messages (type 31)
 RADIALS_PER_RECORD = 120
+
+# The wavelength of the NEXRAD radar signal in meters
 NEXRAD_WAVELENGTH = 0.10
 
+# Find the blob directory to retrieve NEXRAD locations
 FILE_DIR = os.path.dirname(__file__)
 BASE_DIR = os.path.dirname(FILE_DIR)
 BLOB_DIR = os.path.join(BASE_DIR, "blob")
@@ -167,9 +189,9 @@ class Message:
                     self.pattern_number,
                     self.count,
                     self.clutter_map_group,
-                    self.doppler_res,  # 2: 0.5 degrees, 4: 1.0 degrees
-                    self.pulsewidth,  # 2: short, 4: long
-                    self.spare,  # halfwords 7-11 (10 bytes, 5 halfwords)
+                    self.doppler_res,
+                    self.pulsewidth,
+                    self.spare,
                 ) = struct.unpack(self._format_, blob[offset : offset + self._size_])
 
         class Data:
@@ -454,43 +476,45 @@ class Message:
         """
         Returns the PRF (Pulse Repetition Frequency) of the message. (need more work)
         """
-        if self.info.type == 1:
-            return self.head.prf_num
-        elif self.info.type == 31:
+        if self.info.type == 31:
             return self.data["RAD"].v_a / NEXRAD_WAVELENGTH * 4.0
         return 0.0
 
 
-def _records_from_file(file: str):
+def _records_from_file(file: str, skip_metadata: bool = True):
     """
-    Reads a NEXRAD Level II file and extracts VCP and message 31 records.
+    Reads a NEXRAD Level II file and extracts messages
 
     :param file: Path to the NEXRAD Level II file.
-    :return: A tuple of (VCP, message 31 records).
+    :return: A tuple of (VCP, a list of message 31 records).
     """
     # Check if the file is a valid NEXRAD Level II file
     with open(file, "rb") as f:
         content = f.read()
     decompressor = bz2.BZ2Decompressor()
-    has_header = content[:6] == b"AR2V00"
-    offset = LDM_CONTROL_WORD_SIZE + (VOLUME_HEADER_SIZE if has_header else 0)
+    offset = LDM_CONTROL_WORD_SIZE + (VOLUME_HEADER_SIZE if content[:6] == b"AR2V00" else 0)
     blob = bytearray(decompressor.decompress(content[offset:]))
     while len(decompressor.unused_data):
         unused_data = decompressor.unused_data[LDM_CONTROL_WORD_SIZE:]
         decompressor = bz2.BZ2Decompressor()
         blob += decompressor.decompress(unused_data)
-    blob = blob[BZIP_HEADER_SIZE:]
     # Extract messages from the blob
-    msg5, msg31, offset = [], [], 0
+    vcp, meta, msg31, offset = None, [], [], EMPTY_BYTE_COUNT
     while offset < len(blob):
-        message = Message(blob, offset, skip_type1=True)
-        offset = message.next_offset
+        message = Message(blob, offset)
+        if skip_metadata and message.info.type == 15:
+            offset = MESSAGE_5_OFFSET
+        else:
+            offset = message.next_offset
         if message.info.type == 31:
             msg31.append(message)
-        elif message.info.type == 5:
-            msg5.append(message)
-    vcp = msg5[0] if msg5 else None
-    return vcp, msg31
+        elif vcp is None and message.info.type == 5:
+            vcp = message
+        else:
+            meta.append(message)
+    if skip_metadata:
+        return vcp, msg31
+    return meta, vcp, msg31
 
 
 def _nrays_from_vcp(vcp: Message, verbose: int = 0):
@@ -605,7 +629,7 @@ def is_nexrad_bz2(file):
         return True
     # KTLX-20250426-121335-999-2-I
     #
-    # From NEXRAD ICD:
+    # From ICD:
     # The structure of the LDM Compressed Record is a 4-byte, big-endian, signed binary control word
     # followed by a compressed block of Archive II data messages. The control word contains the size, in
     # bytes, of the compressed block not including the control word itself.
