@@ -486,7 +486,8 @@ def _records_from_file(file: str, skip_metadata: bool = True):
     Reads a NEXRAD Level II file and extracts messages
 
     :param file: Path to the NEXRAD Level II file.
-    :return: A tuple of (VCP, a list of message 31 records).
+    :return: (VCP, a list of msg31 records) if skip_metadata is True; or
+             (metadata, VCP, a list of msg31 records) otherwise.
     """
     # Check if the file is a valid NEXRAD Level II file
     with open(file, "rb") as f:
