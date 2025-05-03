@@ -113,10 +113,6 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         raise ValueError(f"{myname} Unidentified NetCDF format")
 
 
-def _get_variable_as_float32(variables, name):
-    return np.array(variables[name][:], dtype=np.float32)
-
-
 def _get_variable_as_masked_float32(variables, name):
     variable = variables[name][:]
     return np.ma.array(variable.data, mask=variable.mask, dtype=np.float32, fill_value=np.nan)
@@ -141,8 +137,8 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     sweepElevation = 0.0
     sweepAzimuth = 0.0
     variables = ncid.variables
-    elevations = _get_variable_as_float32(variables, "elevation")
-    azimuths = _get_variable_as_float32(variables, "azimuth")
+    elevations = np.array(variables["elevation"][:], dtype=np.float32)
+    azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
     mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
         sweepElevation = float(variables["fixed_angle"][:])
@@ -228,9 +224,9 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         sweepElevation = fixedAngle
     elif sweepMode == "rhi":
         sweepAzimuth = fixedAngle
-    elevations = _get_variable_as_float32(variables, "elevation")
-    azimuths = _get_variable_as_float32(variables, "azimuth")
-    ranges = _get_variable_as_float32(variables, "range")
+    elevations = np.array(variables["elevation"][:], dtype=np.float32)
+    azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
+    ranges = np.array(variables["range"][:], dtype=np.float32)
     products = {}
     if "Z" in symbols:
         if "DBZ" in variables:
@@ -272,14 +268,14 @@ def _read_wds_from_ncid(ncid):
     name = ncid.getncattr("TypeName")
     attrs = ncid.ncattrs()
     variables = ncid.variables
-    elevations = _get_variable_as_float32(variables, "Elevation")
-    azimuths = _get_variable_as_float32(variables, "Azimuth")
+    elevations = np.array(variables["Elevation"][:], dtype=np.float32)
+    azimuths = np.array(variables["Azimuth"][:], dtype=np.float32)
     if "GateSize" in attrs:
         r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
     elif "GateWidth" in variables:
         r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, variables["GateWidth"][:][0]
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
-    values = _get_variable_as_float32(variables, name)
+    values = np.array(variables[name][:], dtype=np.float32)
     values[values < -90] = np.nan
     if name == "RhoHV":
         symbol = "R"
