@@ -113,6 +113,15 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         raise ValueError(f"{myname} Unidentified NetCDF format")
 
 
+def _get_variable_as_float32(variables, name):
+    return np.array(variables[name][:], dtype=np.float32)
+
+
+def _get_variable_as_masked_float32(variables, name):
+    variable = variables[name][:]
+    return np.ma.array(variable.data, mask=variable.mask, dtype=np.float32, fill_value=np.nan)
+
+
 def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     longitude = float(ncid.variables["longitude"][0])
     latitude = float(ncid.variables["latitude"][0])
@@ -129,41 +138,40 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
     except Exception as e:
         raise ValueError(f"Unexpected timeString = {timeString}   e = {e}")
-    # if "sweep_number" in ncid.variables:
-    #     sweepNumber = ncid.variables["sweep_number"][:]
-    #     # print(f"sweepNumber = {sweepNumber}")
     sweepElevation = 0.0
     sweepAzimuth = 0.0
-    elevations = np.array(ncid.variables["elevation"][:], dtype=np.float32)
-    azimuths = np.array(ncid.variables["azimuth"][:], dtype=np.float32)
+    variables = ncid.variables
+    elevations = _get_variable_as_float32(variables, "elevation")
+    azimuths = _get_variable_as_float32(variables, "azimuth")
     mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
-        sweepElevation = float(ncid.variables["fixed_angle"][:])
+        sweepElevation = float(variables["fixed_angle"][:])
     elif mode == "rhi":
-        sweepAzimuth = float(ncid.variables["fixed_angle"][:])
+        sweepAzimuth = float(variables["fixed_angle"][:])
     products = {}
     if "Z" in symbols:
-        if "DBZ" in ncid.variables:
-            products["Z"] = ncid.variables["DBZ"][:]
-        elif "DBZHC" in ncid.variables:
-            products["Z"] = ncid.variables["DBZHC"][:]
-    if "V" in symbols and "VEL" in ncid.variables:
-        products["V"] = ncid.variables["VEL"][:]
-    elif "V" in symbols and "VR" in ncid.variables:
-        products["V"] = ncid.variables["VR"][:]
-    if "W" in symbols and "WIDTH" in ncid.variables:
-        products["W"] = ncid.variables["WIDTH"][:]
-    if "D" in symbols and "ZDR" in ncid.variables:
-        products["D"] = ncid.variables["ZDR"][:]
-    if "P" in symbols and "PHIDP" in ncid.variables:
-        products["P"] = ncid.variables["PHIDP"][:]
-    if "R" in symbols and "RHOHV" in ncid.variables:
-        products["R"] = ncid.variables["RHOHV"][:]
+        if "DBZ" in variables:
+            products["Z"] = _get_variable_as_masked_float32(variables, "DBZ")
+        elif "DBZHC" in variables:
+            products["Z"] = _get_variable_as_masked_float32(variables, "DBZHC")
+    if "V" in symbols:
+        if "VEL" in variables:
+            products["V"] = _get_variable_as_masked_float32(variables, "VEL")
+        elif "VR" in variables:
+            products["V"] = _get_variable_as_masked_float32(variables, "VR")
+    if "W" in symbols and "WIDTH" in variables:
+        products["W"] = _get_variable_as_masked_float32(variables, "WIDTH")
+    if "D" in symbols and "ZDR" in variables:
+        products["D"] = _get_variable_as_masked_float32(variables, "ZDR")
+    if "P" in symbols and "PHIDP" in variables:
+        products["P"] = _get_variable_as_masked_float32(variables, "PHIDP")
+    if "R" in symbols and "RHOHV" in variables:
+        products["R"] = _get_variable_as_masked_float32(variables, "RHOHV")
     prf = "-"
     waveform = "u"
     gatewidth = 100.0
-    if "prt" in ncid.variables:
-        prf = round(1.0 / ncid.variables["prt"][:][0], 1)
+    if "prt" in variables:
+        prf = round(1.0 / variables["prt"][:][0], 1)
     if "radarkit_parameters" in ncid.groups:
         group = ncid.groups["radarkit_parameters"]
         attrs = group.ncattrs()
@@ -171,12 +179,12 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
             waveform = group.getncattr("waveform")
         if "prt" in attrs:
             prf = round(float(group.getncattr("prf")), 1)
-    if "meters_between_gates" in ncid.variables["range"]:
-        gatewidth = float(ncid.variables["range"].getncattr("meters_between_gates"))
+    if "meters_between_gates" in variables["range"]:
+        gatewidth = float(variables["range"].getncattr("meters_between_gates"))
     else:
-        ranges = np.array(ncid.variables["range"][:2], dtype=float)
+        ranges = np.array(variables["range"][:2], dtype=float)
         gatewidth = ranges[1] - ranges[0]
-    ranges = np.array(ncid.variables["range"][:], dtype=np.float32)
+    ranges = np.array(variables["range"][:], dtype=np.float32)
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
@@ -220,25 +228,25 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         sweepElevation = fixedAngle
     elif sweepMode == "rhi":
         sweepAzimuth = fixedAngle
-    elevations = np.array(variables["elevation"][:], dtype=np.float32)
-    azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
-    ranges = np.array(variables["range"][:], dtype=np.float32)
+    elevations = _get_variable_as_float32(variables, "elevation")
+    azimuths = _get_variable_as_float32(variables, "azimuth")
+    ranges = _get_variable_as_float32(variables, "range")
     products = {}
     if "Z" in symbols:
         if "DBZ" in variables:
-            products["Z"] = variables["DBZ"][:]
+            products["Z"] = _get_variable_as_masked_float32(variables, "DBZ")
         elif "RCP" in variables:
-            products["Z"] = variables["RCP"][:]
+            products["Z"] = _get_variable_as_masked_float32(variables, "RCP")
     if "V" in symbols and "VEL" in variables:
-        products["V"] = variables["VEL"][:]
+        products["V"] = _get_variable_as_masked_float32(variables, "VEL")
     if "W" in symbols and "WIDTH" in variables:
-        products["W"] = variables["WIDTH"][:]
+        products["W"] = _get_variable_as_masked_float32(variables, "WIDTH")
     if "D" in symbols and "ZDR" in variables:
-        products["D"] = variables["ZDR"][:]
+        products["D"] = _get_variable_as_masked_float32(variables, "ZDR")
     if "P" in symbols and "PHIDP" in variables:
-        products["P"] = variables["PHIDP"][:]
+        products["P"] = _get_variable_as_masked_float32(variables, "PHIDP")
     if "R" in symbols and "RHOHV" in variables:
-        products["R"] = variables["RHOHV"][:]
+        products["R"] = _get_variable_as_masked_float32(variables, "RHOHV")
     return {
         "kind": Kind.CF2,
         "txrx": TxRx.BISTATIC,
@@ -263,14 +271,15 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
 def _read_wds_from_ncid(ncid):
     name = ncid.getncattr("TypeName")
     attrs = ncid.ncattrs()
-    elevations = np.array(ncid.variables["Elevation"][:], dtype=np.float32)
-    azimuths = np.array(ncid.variables["Azimuth"][:], dtype=np.float32)
+    variables = ncid.variables
+    elevations = _get_variable_as_float32(variables, "Elevation")
+    azimuths = _get_variable_as_float32(variables, "Azimuth")
     if "GateSize" in attrs:
         r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
-    elif "GateWidth" in ncid.variables:
-        r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.variables["GateWidth"][:][0]
+    elif "GateWidth" in variables:
+        r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, variables["GateWidth"][:][0]
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
-    values = np.array(ncid.variables[name][:], dtype=np.float32)
+    values = _get_variable_as_float32(variables, name)
     values[values < -90] = np.nan
     if name == "RhoHV":
         symbol = "R"
@@ -447,7 +456,7 @@ def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], 
             values[k, :] = msg.data[symbol].values
         mask = values <= 1
         values = (values - offset) / scale
-        arrays[symbol] = np.ma.array(values[:, :max_gates], mask=mask[:, :max_gates])
+        arrays[symbol] = np.ma.array(values[:, :max_gates], mask=mask[:, :max_gates], fill_value=np.nan)
     # Replace keys: REF -> Z, VEL -> V, SW -> W, ZDR -> D, PHI -> P, RHO -> R
     products = {}
     if "REF" in arrays and "Z" in symbols:
