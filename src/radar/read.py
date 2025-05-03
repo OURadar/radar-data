@@ -11,7 +11,7 @@ from netCDF4 import Dataset
 from .common import *
 from .cosmetics import colorize, NumpyPrettyPrinter
 from .dailylog import Logger
-from .nexrad import get_nexrad_location, get_vcp_msg31_timestamp, is_nexrad_bz2
+from .nexrad import get_nexrad_location, get_vcp_msg31_timestamp, is_nexrad_format
 
 _lock = threading.Lock()
 
@@ -552,7 +552,7 @@ def read(source, **kwargs):
     elif ext == ".nc":
         data = _read_nc(source, symbols=symbols, verbose=verbose)
         tarinfo = {}
-    elif is_nexrad_bz2(source):
+    elif is_nexrad_format(source):
         sweep_index = kwargs.get("sweep_index", 0)
         data = _read_nexrad(source, sweep_index=sweep_index, symbols=symbols, verbose=verbose)
         tarinfo = {}
