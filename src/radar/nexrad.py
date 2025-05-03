@@ -621,7 +621,7 @@ def get_nexrad_location(site):
     return None
 
 
-def is_nexrad_bz2(file):
+def is_nexrad_format(file):
     with open(file, "rb") as f:
         head = f.read(32)
     # KTLX20250426_121335_V06 or KTLX-20250426-121335-999-1-S
