@@ -10,7 +10,6 @@ from netCDF4 import Dataset
 
 from .common import *
 from .cosmetics import colorize, NumpyPrettyPrinter
-from .dailylog import Logger
 from .nexrad import get_nexrad_location, get_vcp_msg31_timestamp, is_nexrad_format
 
 _lock = threading.Lock()
@@ -21,7 +20,7 @@ sep = colorize("/", "orange")
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
 tzinfo = datetime.timezone.utc
-logger = Logger("radar-data")
+logger = logging.getLogger("radar-data")
 
 
 class Kind:
@@ -139,7 +138,7 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     variables = ncid.variables
     elevations = np.array(variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
-    mode = b"".join(ncid.variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
+    mode = b"".join(variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
     if mode == "azimuth_surveillance":
         sweepElevation = float(variables["fixed_angle"][:])
     elif mode == "rhi":
@@ -274,6 +273,9 @@ def _read_wds_from_ncid(ncid):
         r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, ncid.getncattr("GateSize")
     elif "GateWidth" in variables:
         r0, nr, dr = ncid.getncattr("RangeToFirstGate"), ncid.dimensions["Gate"].size, variables["GateWidth"][:][0]
+    else:
+        logger.warning(f"Missing GateSize or GateWidth in {name}")
+        r0, nr, dr = 0.0, ncid.dimensions["Gate"].size, 1.0
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
     values = np.array(variables[name][:], dtype=np.float32)
     values[values < -90] = np.nan
@@ -301,7 +303,7 @@ def _read_wds_from_ncid(ncid):
         "sweepAzimuth": ncid.getncattr("Azimuth") if "Azimuth" in attrs else 0.0,
         "prf": float(round(ncid.getncattr("PRF-value") * 0.1) * 10.0),
         "waveform": ncid.getncattr("Waveform") if "Waveform" in attrs else "",
-        "gatewidth": float(ncid.variables["GateWidth"][:][0]),
+        "gatewidth": dr,
         "createdBy": ncid.getncattr("CreatedBy"),
         "elevations": elevations,
         "azimuths": azimuths,
@@ -562,7 +564,7 @@ def read(source, **kwargs):
         data = _read_nexrad(source, sweep_index=sweep_index, symbols=symbols, verbose=verbose)
         tarinfo = {}
     else:
-        raise ValueError(f"{myname} Unsupported file extension {ext}")
+        raise ValueError(f"{myname} Unsupported file format (ext = {ext})")
     if data is None:
         raise ValueError(f"{myname} No data found in {source}")
     if kwargs.get("u8", False):

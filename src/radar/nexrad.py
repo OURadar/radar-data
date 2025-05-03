@@ -34,9 +34,12 @@ import bz2
 import glob
 import json
 import struct
+import logging
 import datetime
 import urllib.request
 import numpy as np
+
+from .cosmetics import colorize
 
 # The first 12 bytes are empty, which means the "Message Size" does not begin until byte 13
 EMPTY_BYTE_COUNT = 12
@@ -89,6 +92,8 @@ re_parts_volume = re.compile(
     + r"(?P<time>20\d{2}(0\d|1[012])([012]\d|3[01])_([01]\d|2[0-3])[0-5]\d[0-5]\d)_"
     + r"(?P<kind>V\d{2})"
 )
+
+logger = logging.getLogger("radar-data")
 
 
 class Message:
@@ -544,6 +549,7 @@ def _get_vcp_msg31_timestring_volume(filename: str, **kwargs):
 
 
 def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
+    myname = colorize("nexrad._get_vcp_msg31_timestring_stripped", "green")
     verbose = kwargs.get("verbose", 0)
     sweep_index = kwargs.get("sweep_index", 0)
     folder, basename = os.path.split(filename)
@@ -566,8 +572,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     # Collect message 31 records of the selected sweep_index
     msg31 = []
     for file in files[start_end[sweep_index]]:
-        if verbose:
-            print(f"Processing {file}")
+        logger.info(f"{myname} {file}")
         _, m = _records_from_file(file)
         msg31.extend(m)
     timestring = re_parts_stripped.match(os.path.basename(filename))
