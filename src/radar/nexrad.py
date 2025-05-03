@@ -1,3 +1,33 @@
+"""
+-------------------------------------------------------------------------
+                          Volume Header Record
+A 24-byte record that is described in Figure 1. This record will contain
+the volume number along with a date and time field.
+.........................................................................
+                          LDM Compressed Record
+A record that is bzip2 compressed. It consists of Metadata message types
+15, 13, 18, 3, 5, and 2. See section 7.3.5.
+
+                (These two records are in the -S file)
+-------------------------------------------------------------------------
+                        LDM Compressed Record
+A variable size record that is bzip2 compressed. It consists of 120 radial
+data messages (type 1 or 31) plus 0 or more RDA Status messages (type
+2). The last message will have a radial status signaling “end of
+elevation” or “end of volume”. See paragraph 7.3.4.
+                     (This record is in a -I file)
+-------------------------------------------------------------------------
+                      Repeat (LDM Compressed Record)
+                                  Or
+                  End of File (for end of volume data)
+
+                     (This record is in a -I file)
+                     (Last record is in a -S file)
+--------------------------------------------------------------------------
+
+Modified from Figure 2 in NEXRAD Interface Control Document 2620010E
+"""
+
 import os
 import re
 import bz2
@@ -10,9 +40,9 @@ import numpy as np
 
 BZIP_HEADER_SIZE = 12
 VOLUME_HEADER_SIZE = 24
-CONTROL_WORD_SIZE = 4
-RECORDS_PER_STRIP = 120
-RECORD_SIZE = 2432
+LDM_CONTROL_WORD_SIZE = 4
+METADATA_RECORD_SIZE = 2432
+RADIALS_PER_RECORD = 120
 NEXRAD_WAVELENGTH = 0.10
 
 FILE_DIR = os.path.dirname(__file__)
@@ -338,7 +368,7 @@ class Message:
         :param bypass1: If True, skips decoding of MSG1 (message header is still always decoded).
         """
         self.offset = offset
-        self.next_offset = offset + RECORD_SIZE
+        self.next_offset = offset + METADATA_RECORD_SIZE
         self.info = None
         self.head = None
         self.data = {}
@@ -439,14 +469,14 @@ def _records_from_file(file: str):
     :return: A tuple of (VCP, message 31 records).
     """
     # Check if the file is a valid NEXRAD Level II file
-    has_header = ("V06" in file) or ("-" in file and file.split("-")[-1] == "S")
-    with open(file, "rb") as file_handler:
-        content = file_handler.read()
+    with open(file, "rb") as f:
+        content = f.read()
     decompressor = bz2.BZ2Decompressor()
-    skip = VOLUME_HEADER_SIZE + CONTROL_WORD_SIZE if has_header else CONTROL_WORD_SIZE
-    blob = bytearray(decompressor.decompress(content[skip:]))
+    has_header = content[:6] == b"AR2V00"
+    offset = LDM_CONTROL_WORD_SIZE + (VOLUME_HEADER_SIZE if has_header else 0)
+    blob = bytearray(decompressor.decompress(content[offset:]))
     while len(decompressor.unused_data):
-        unused_data = decompressor.unused_data[CONTROL_WORD_SIZE:]
+        unused_data = decompressor.unused_data[LDM_CONTROL_WORD_SIZE:]
         decompressor = bz2.BZ2Decompressor()
         blob += decompressor.decompress(unused_data)
     blob = blob[BZIP_HEADER_SIZE:]
@@ -503,7 +533,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     # Get VCP info from the first file
     vcp, _ = _records_from_file(files[0])
     nrays = _nrays_from_vcp(vcp, verbose=verbose)
-    nfiles = [x // RECORDS_PER_STRIP for x in nrays]
+    nfiles = [x // RADIALS_PER_RECORD for x in nrays]
     counts = [sum(nfiles[:i]) for i in range(len(nfiles) + 1)]
     start_end = [slice(x + 1, y + 1) for x, y in zip(counts[:-1], counts[1:])]
     if sweep_index >= len(start_end):
@@ -530,7 +560,7 @@ def get_vcp_msg31_timestamp(filename: str, **kwargs):
         - verbose: Verbosity level (default is 0).
     :return: A tuple of (VCP, message 31 records, timestamp).
     """
-    if "V06" in filename:
+    if filename.endswith("_V06"):
         # V06 single volume format
         vcp, msg31, timestring = _get_vcp_msg31_timestring_volume(filename, **kwargs)
     else:
@@ -571,9 +601,16 @@ def is_nexrad_bz2(file):
     with open(file, "rb") as f:
         head = f.read(32)
     # KTLX20250426_121335_V06 or KTLX-20250426-121335-999-1-S
-    if head[VOLUME_HEADER_SIZE + CONTROL_WORD_SIZE :].startswith(b"\x42\x5a\x68"):
+    if head[:6] == b"AR2V00":
         return True
-    # KTLX-20250426-121335-999-1-S
-    if head[CONTROL_WORD_SIZE:].startswith(b"\x42\x5a\x68"):
+    # KTLX-20250426-121335-999-2-I
+    #
+    # From NEXRAD ICD:
+    # The structure of the LDM Compressed Record is a 4-byte, big-endian, signed binary control word
+    # followed by a compressed block of Archive II data messages. The control word contains the size, in
+    # bytes, of the compressed block not including the control word itself.
+    size_in_control_word = abs(struct.unpack(">I", head[:LDM_CONTROL_WORD_SIZE])[0])
+    size_match = os.path.getsize(file) - LDM_CONTROL_WORD_SIZE == size_in_control_word
+    if size_match and head[LDM_CONTROL_WORD_SIZE : LDM_CONTROL_WORD_SIZE + 3] == b"\x42\x5a\x68":
         return True
     return False

@@ -417,7 +417,7 @@ def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], 
     myname = colorize("radar._read_nexrad()", "green")
     logger.info(f"{myname} {colorize(source, 'yellow')}")
 
-    vcp, msg31, timestamp = get_vcp_msg31_timestamp(source)
+    vcp, msg31, timestamp = get_vcp_msg31_timestamp(source, sweep_index=sweep_index, verbose=verbose)
 
     nrays = len(msg31)
     data = msg31[0].data
@@ -449,11 +449,19 @@ def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], 
         values = (values - offset) / scale
         arrays[symbol] = np.ma.array(values[:, :max_gates], mask=mask[:, :max_gates])
     # Replace keys: REF -> Z, VEL -> V, SW -> W, ZDR -> D, PHI -> P, RHO -> R
-    products = (
-        {"Z": arrays["REF"], "D": arrays["ZDR"], "P": arrays["PHI"], "R": arrays["RHO"]}
-        if ("ZDR" in arrays)
-        else {"Z": arrays["REF"], "V": arrays["VEL"], "W": arrays["SW"]}
-    )
+    products = {}
+    if "REF" in arrays and "Z" in symbols:
+        products["Z"] = arrays["REF"]
+    if "VEL" in arrays and "V" in symbols:
+        products["V"] = arrays["VEL"]
+    if "SW" in arrays and "W" in symbols:
+        products["W"] = arrays["SW"]
+    if "ZDR" in arrays and "D" in symbols:
+        products["D"] = arrays["ZDR"]
+    if "PHI" in arrays and "P" in symbols:
+        products["P"] = arrays["PHI"]
+    if "RHO" in arrays and "R" in symbols:
+        products["R"] = arrays["RHO"]
     return {
         "kind": Kind.M31,
         "txrx": TxRx.MONOSTATIC,
