@@ -108,8 +108,8 @@ class Client(Manager):
             if want_tarinfo:
                 return None, None
             return None
-        myname = pretty_object_name("Client.get", sock.fileno())
         sock, lock = self._getSocketAndLock()
+        myname = pretty_object_name("Client.get", sock.fileno())
         with lock:
             sock.settimeout(5.0)
             try:

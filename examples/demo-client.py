@@ -14,6 +14,15 @@ if os.path.exists(srcDir):
 import radar
 
 logger = logging.getLogger("demo-client")
+formatter = logging.Formatter(radar.cosmetics.log_format)
+fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-client.log"))
+fileHandler.setFormatter(formatter)
+logger.addHandler(fileHandler)
+streamHandler = logging.StreamHandler()
+streamHandler.setFormatter(formatter)
+streamHandler.setLevel(logging.INFO)
+logger.addHandler(streamHandler)
+logger.setLevel(logging.INFO)
 
 SIMULATE_DELAY = False
 
@@ -35,14 +44,6 @@ def request(client, file):
 
 
 ###
-
-fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-client.log"))
-fileHandler.setFormatter(radar.log_formatter)
-logger.addHandler(fileHandler)
-streamHandler = logging.StreamHandler()
-streamHandler.setFormatter(radar.log_formatter)
-logger.addHandler(streamHandler)
-logger.setLevel(logging.INFO)
 
 logger.info("Starting ...")
 

@@ -3,24 +3,20 @@ import re
 import logging
 import tarfile
 import datetime
-import threading
 import numpy as np
 
 from netCDF4 import Dataset
 
 from .common import *
-from .cosmetics import colorize, NumpyPrettyPrinter
+from .cosmetics import colorize
 from .nexrad import get_nexrad_location, get_vcp_msg31_timestamp, is_nexrad_format
 
-_lock = threading.Lock()
+utc = datetime.timezone.utc
+sep = colorize("/", "orange")
+logger = logging.getLogger("radar-data")
+dot_colors = ["black", "gray", "blue", "green", "orange"]
 
 np.set_printoptions(precision=2, suppress=True, threshold=10)
-
-sep = colorize("/", "orange")
-dot_colors = ["black", "gray", "blue", "green", "orange"]
-sweep_printer = NumpyPrettyPrinter(depth=2, indent=2, sort_dicts=False)
-tzinfo = datetime.timezone.utc
-logger = logging.getLogger("radar-data")
 
 
 class Kind:
@@ -37,7 +33,7 @@ class TxRx:
 
 
 """
-    value - Raw values
+    Value to index conversion using RadarKit convention
 """
 
 
@@ -87,8 +83,8 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         version = ncid.getncattr("version") if "version" in attrs else None
         if version is None:
             raise ValueError(f"{myname} No version found")
-        if verbose:
-            logger.info(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
+        if verbose > 1:
+            logger.debug(f"{myname} {version} {sep} {conventions} {sep} {subConventions}")
         m = re_cf_version.match(version)
         if m:
             m = m.groupdict()
@@ -104,9 +100,9 @@ def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
         raise ValueError(f"{myname} Unsupported format {show}")
     # WDSS-II format contains "TypeName" and "DataType"
     elif "TypeName" in attrs and "DataType" in attrs:
-        if verbose:
+        if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
-            logger.info(f"{myname} WDSS-II {sep} {createdBy}")
+            logger.debug(f"{myname} WDSS-II {sep} {createdBy}")
         return _read_wds_from_ncid(ncid)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
@@ -130,7 +126,7 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if timeString.endswith(r"Z"):
         timeString = timeString[:-1]
     try:
-        timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
+        timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=utc).timestamp()
     except Exception as e:
         raise ValueError(f"Unexpected timeString = {timeString}   e = {e}")
     sweepElevation = 0.0
@@ -212,7 +208,7 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if timeString.endswith("Z"):
         timeString = timeString[:-1]
     try:
-        time = datetime.datetime.fromisoformat(timeString).replace(tzinfo=tzinfo).timestamp()
+        time = datetime.datetime.fromisoformat(timeString).replace(tzinfo=utc).timestamp()
     except Exception as e:
         raise ValueError(f"Unexpected timeString = {timeString} {e}")
     variables = ncid.groups["sweep_0001"].variables
@@ -336,9 +332,8 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             info = _quartet_to_tarinfo(tarinfo["*"])
             with aid.extractfile(info) as fid:
                 content = fid.read()
-                with _lock:
-                    with Dataset("memory", memory=content) as ncid:
-                        sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+            with Dataset("memory", memory=content) as ncid:
+                sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
             for symbol in symbols:
                 if symbol not in tarinfo:
@@ -349,13 +344,12 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
                         show = colorize(info.name, "yellow")
                         logger.debug(f"{myname} {show}")
                     content = fid.read()
-                    with _lock:
-                        with Dataset("memory", mode="r", memory=content) as ncid:
-                            single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
-                    if sweep is None:
-                        sweep = single
-                    else:
-                        sweep["products"] = {**sweep["products"], **single["products"]}
+                with Dataset("memory", mode="r", memory=content) as ncid:
+                    single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+                if sweep is None:
+                    sweep = single
+                else:
+                    sweep["products"] = {**sweep["products"], **single["products"]}
     if sweep is None:
         logger.error(f"{myname} No sweep found in {source}")
         return (None, tarinfo) if want_tarinfo else None
@@ -376,16 +370,14 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if parts is None:
         parts = re_3parts.search(basename)
         if parts is None:
-            with _lock:
-                with Dataset(source, mode="r") as ncid:
-                    return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+            with Dataset(source, mode="r") as ncid:
+                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     parts = parts.groupdict()
     if verbose > 1:
         logger.debug(f"{myname} parts = {parts}")
     if "symbol" not in parts:
-        with _lock:
-            with Dataset(source, mode="r") as ncid:
-                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with Dataset(source, mode="r") as ncid:
+            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     folder = os.path.dirname(source)
     known = True
     files = []
@@ -399,17 +391,15 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     if not known:
         if verbose > 1:
             logger.debug(f"{myname} {source}")
-        with _lock:
-            with Dataset(source, mode="r") as ncid:
-                return _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with Dataset(source, mode="r") as ncid:
+            return _read_ncid(ncid, symbols=symbols, verbose=verbose)
     sweep = None
     for file in files:
         if verbose > 1:
             show = colorize(os.path.basename(file), "yellow")
             logger.debug(f"{myname} {show}")
-        with _lock:
-            with Dataset(file, mode="r") as ncid:
-                single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
+        with Dataset(file, mode="r") as ncid:
+            single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         if single is None:
             logger.error(f"{myname} Unexpected {file}")
             return None
@@ -421,8 +411,9 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
 
 
 def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
-    myname = colorize("radar._read_nexrad()", "green")
-    logger.info(f"{myname} {colorize(source, 'yellow')}")
+    if verbose > 1:
+        myname = colorize("radar._read_nexrad()", "green")
+        logger.debug(f"{myname} {colorize(source, 'yellow')}")
 
     vcp, msg31, timestamp = get_vcp_msg31_timestamp(source, sweep_index=sweep_index, verbose=verbose)
 
@@ -579,10 +570,6 @@ def read(source, **kwargs):
     if want_tarinfo:
         return data, tarinfo
     return data
-
-
-def pprint(obj):
-    return sweep_printer.pprint(obj)
 
 
 def set_logger(new_logger):

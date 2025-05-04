@@ -523,23 +523,21 @@ def _records_from_file(file: str, skip_metadata: bool = True):
     return meta, vcp, msg31
 
 
-def _nrays_from_vcp(vcp: Message, verbose: int = 0):
+def _nrays_from_vcp(vcp: Message):
     nrays = []
-    for scan in vcp.data:
+    for k, scan in enumerate(vcp.data):
         count = 720 if scan.super_res & 0x1 else 360
-        if verbose > 1:
-            print(f"E{scan.elevation_angle:5.2f}° {count} rays")
+        logger.debug(f"VCP[{k}] E{scan.elevation_angle:.2f}°  {count} rays")
         nrays.append(count)
     return nrays
 
 
 def _get_vcp_msg31_timestring_volume(filename: str, **kwargs):
-    verbose = kwargs.get("verbose", 0)
     sweep_index = kwargs.get("sweep_index", 0)
     vcp, msg31 = _records_from_file(filename)
     if vcp is None or len(msg31) == 0:
         raise ValueError(f"Invalid file format: {filename} (vcp = {vcp}), {len(msg31)} msg31)")
-    nrays = _nrays_from_vcp(vcp, verbose=verbose)
+    nrays = _nrays_from_vcp(vcp)
     counts = [sum(nrays[:i]) for i in range(len(nrays) + 1)]
     start_end = [slice(x, y) for x, y in zip(counts[:-1], counts[1:])]
     timestring = re_parts_volume.match(os.path.basename(filename))
@@ -550,7 +548,6 @@ def _get_vcp_msg31_timestring_volume(filename: str, **kwargs):
 
 def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     myname = colorize("nexrad._get_vcp_msg31_timestring_stripped", "green")
-    verbose = kwargs.get("verbose", 0)
     sweep_index = kwargs.get("sweep_index", 0)
     folder, basename = os.path.split(filename)
     parts = re_parts_stripped.match(basename)
@@ -563,7 +560,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     files = sorted(files, key=lambda x: int(x.split("-")[-2]))
     # Get VCP info from the first file
     vcp, _ = _records_from_file(files[0])
-    nrays = _nrays_from_vcp(vcp, verbose=verbose)
+    nrays = _nrays_from_vcp(vcp)
     nfiles = [x // RADIALS_PER_RECORD for x in nrays]
     counts = [sum(nfiles[:i]) for i in range(len(nfiles) + 1)]
     start_end = [slice(x + 1, y + 1) for x, y in zip(counts[:-1], counts[1:])]
@@ -572,7 +569,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     # Collect message 31 records of the selected sweep_index
     msg31 = []
     for file in files[start_end[sweep_index]]:
-        logger.info(f"{myname} {file}")
+        logger.debug(f"{myname} {file}")
         _, m = _records_from_file(file)
         msg31.extend(m)
     timestring = re_parts_stripped.match(os.path.basename(filename))

@@ -11,10 +11,12 @@ if os.path.exists(srcDir):
 import radar
 
 logger = logging.getLogger("demo-server")
+formatter = logging.Formatter(radar.cosmetics.log_format)
 fileHandler = logging.FileHandler(os.path.expanduser("~/logs/demo-server.log"))
-fileHandler.setFormatter(radar.log_formatter)
+fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
 streamHandler = logging.StreamHandler()
+streamHandler.setFormatter(formatter)
 streamHandler.setLevel(logging.INFO)
 logger.addHandler(streamHandler)
 logger.setLevel(logging.INFO)

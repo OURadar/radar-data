@@ -3,8 +3,9 @@
 #
 
 import pprint
-import logging
 import numpy as np
+
+# Constants, more constants at the end of the file
 
 colors = {
     "red": 196,
@@ -97,14 +98,6 @@ def byte_string(payload):
         return p + payload_binary(payload[1:8]) + " ... " + payload_binary(payload[-3:])
 
 
-def truncate_array(arr, front=3, back=3):
-    if len(arr) > front + back:
-        truncated = arr[:front] + ["..."] + arr[-back:]
-    else:
-        truncated = arr
-    return truncated
-
-
 def test_byte_string():
     x = b'\x03{"Transceiver":{"Value":true,"Enum":0}, "Pedestal":{"Value":true,"Enum":0}, "Time":1570804516}'
     print(byte_string(x))
@@ -193,6 +186,16 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 write(delimnl)
 
 
+def print(data: dict):
+    """
+    Pretty print the data dictionary.
+    """
+    global printer
+    if printer is None:
+        printer = NumpyPrettyPrinter(indent=2, depth=2, width=120, sort_dicts=False)
+    printer.pprint(data)
+
+
 cross = colorize("✗", "red")
 check = colorize("✓", "green")
 ignore = colorize("✓", "yellow")
@@ -200,4 +203,5 @@ missing = colorize("✗", "orange")
 processed = colorize("✓✓", "green")
 
 log_format = "%(asctime)s %(levelname)-7s %(message)s"
-log_formatter = logging.Formatter(log_format)
+
+printer = None
