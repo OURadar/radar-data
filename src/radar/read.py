@@ -210,7 +210,7 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     if timeString.endswith("Z"):
         timeString = timeString[:-1]
     try:
-        time = datetime.datetime.fromisoformat(timeString).replace(tzinfo=utc).timestamp()
+        timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=utc).timestamp()
     except Exception as e:
         raise ValueError(f"Unexpected timeString = {timeString} {e}")
     variables = ncid.groups["sweep_0001"].variables
@@ -243,7 +243,7 @@ def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
     return {
         "kind": Kind.CF2,
         "txrx": TxRx.BISTATIC,
-        "time": time,
+        "time": timestamp,
         "latitude": latitude,
         "longitude": longitude,
         "sweepElevation": sweepElevation,
