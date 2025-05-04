@@ -14,10 +14,7 @@ def send(socket, data):
 
 
 def recv(socket):
-    try:
-        head = socket.recv(4)
-    except:
-        return None
+    head = socket.recv(4)
     if not head:
         return None
     elif head == b"ping":

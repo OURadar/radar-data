@@ -4,6 +4,7 @@ import glob
 import time
 import random
 import logging
+import datetime
 import threading
 
 srcDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"))
@@ -33,8 +34,8 @@ def request(client, file):
     if data is None:
         logger.info(f"Ign: {file} ...")
         return None
-    unixTime = data["time"]
-    timeString = time.strftime(r"%Y%m%d-%H%M%S", time.localtime(unixTime))
+    timestamp = datetime.datetime.fromtimestamp(data["time"], tz=datetime.timezone.utc)
+    timeString = timestamp.strftime(r"%Y%m%d-%H%M%S")
     basename = os.path.basename(file)
     elements = basename.split("-")
     fileTime = f"{elements[1]}-{elements[2]}"
@@ -50,12 +51,16 @@ logger.info("Starting ...")
 client = radar.product.Client(count=6, logger=logger)
 
 # Replace with where the data is stored
-# files = sorted(glob.glob("/mnt/data/PX1000/2024/20240820/_original/*xz"))
-files = sorted(glob.glob("/Volumes/Data/PX1000/2024/20240820/_original/*xz"))
+# if os.path.exist("/mnt/data/PX1000"):
+#     files = sorted(glob.glob("/mnt/data/PX1000/2024/20240820/_original/*xz"))
+# elif os.path.exist("/Volumes/Data/PX1000"):
+#     files = sorted(glob.glob("/Volumes/Data/PX1000/2024/20240820/_original/*xz"))
+# else:
+files = sorted(glob.glob(os.path.expanduser("~/Downloads/data/read-test/PX*")))
 
 tic = time.time()
 fifo = radar.FIFOBuffer()
-for file in files[-200:-100]:
+for file in files:
     req = threading.Thread(target=request, args=(client, file))
     req.start()
     fifo.enqueue(req)

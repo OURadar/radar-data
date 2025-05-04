@@ -18,6 +18,8 @@ dot_colors = ["black", "gray", "blue", "green", "orange"]
 
 np.set_printoptions(precision=2, suppress=True, threshold=10)
 
+EPOCH_DATETIME_UTC = datetime.datetime(1970, 1, 1, tzinfo=utc)
+
 
 class Kind:
     UNK = "U"
@@ -275,6 +277,8 @@ def _read_wds_from_ncid(ncid):
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
     values = np.array(variables[name][:], dtype=np.float32)
     values[values < -90] = np.nan
+    scantime = EPOCH_DATETIME_UTC + datetime.timedelta(seconds=int(ncid.getncattr("Time")))
+    timestamp = scantime.timestamp()
     if name == "RhoHV":
         symbol = "R"
     elif name == "PhiDP":
@@ -292,7 +296,7 @@ def _read_wds_from_ncid(ncid):
     return {
         "kind": Kind.WDS,
         "txrx": TxRx.MONOSTATIC,
-        "time": ncid.getncattr("Time"),
+        "time": timestamp,
         "latitude": float(ncid.getncattr("Latitude")),
         "longitude": float(ncid.getncattr("Longitude")),
         "sweepElevation": ncid.getncattr("Elevation") if "Elevation" in attrs else 0.0,
