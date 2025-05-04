@@ -600,7 +600,7 @@ def get_vcp_msg31_timestamp(filename: str, **kwargs):
     if not timestring:
         raise ValueError(f"Invalid filename format: {filename}")
     timestamp = datetime.datetime.strptime(timestring, r"%Y%m%d-%H%M%S")
-    timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+    timestamp = timestamp.replace(tzinfo=datetime.timezone.utc).timestamp()
     return vcp, msg31, timestamp
 
 
