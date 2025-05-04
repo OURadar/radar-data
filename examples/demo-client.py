@@ -42,7 +42,7 @@ def request(client, file):
     mark = (
         radar.cosmetics.check
         if target == timeString
-        else radar.cosmetics.ignore if target[:8] == timeString[:8] else radar.cosmetics.cross
+        else radar.cosmetics.ignore if target and target[:8] == timeString[:8] else radar.cosmetics.cross
     )
     logger.info(f"Out: {basename} / {timeString} {mark}")
     return data
