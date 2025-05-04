@@ -28,7 +28,7 @@ colors = {
 highlights = {"info": "\033[48;5;6;38;5;15m", "warning": "\033[48;5;172;38;5;15m", "error": "\033[1;48;5;3;38;5;15m"}
 
 
-def colorize(text, color="white", end="\033[m"):
+def colorize(text, color="white", end="\033[0m"):
     if isinstance(color, int):
         return f"\033[38;5;{color}m{text}{end}"
     elif color in colors:
