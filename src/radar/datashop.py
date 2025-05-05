@@ -131,7 +131,7 @@ def main():
         config = {"host": "localhost", "port": 50000, "count": 4, "cache": 1000, "utc": True}
 
     # Set logger level to INFO by default
-    logging.basicConfig(format=radar.log_format, level=logging.DEBUG if args.verbose else logging.INFO)
+    logging.basicConfig(format=radar.cosmetics.log_format, level=logging.DEBUG if args.verbose else logging.INFO)
     if config.get("utc", False):
         logging.Formatter.converter = time.gmtime
 

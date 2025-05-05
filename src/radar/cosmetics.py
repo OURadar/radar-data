@@ -3,8 +3,9 @@
 #
 
 import pprint
-import logging
 import numpy as np
+
+# Constants, more constants at the end of the file
 
 colors = {
     "red": 196,
@@ -27,7 +28,7 @@ colors = {
 highlights = {"info": "\033[48;5;6;38;5;15m", "warning": "\033[48;5;172;38;5;15m", "error": "\033[1;48;5;3;38;5;15m"}
 
 
-def colorize(text, color="white", end="\033[m"):
+def colorize(text, color="white", end="\033[0m"):
     if isinstance(color, int):
         return f"\033[38;5;{color}m{text}{end}"
     elif color in colors:
@@ -95,14 +96,6 @@ def byte_string(payload):
 
         p = f"{payload[0:1]}"
         return p + payload_binary(payload[1:8]) + " ... " + payload_binary(payload[-3:])
-
-
-def truncate_array(arr, front=3, back=3):
-    if len(arr) > front + back:
-        truncated = arr[:front] + ["..."] + arr[-back:]
-    else:
-        truncated = arr
-    return truncated
 
 
 def test_byte_string():
@@ -193,6 +186,16 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 write(delimnl)
 
 
+def print(data: dict):
+    """
+    Pretty print the data dictionary.
+    """
+    global printer
+    if printer is None:
+        printer = NumpyPrettyPrinter(indent=2, depth=2, width=120, sort_dicts=False)
+    printer.pprint(data)
+
+
 cross = colorize("✗", "red")
 check = colorize("✓", "green")
 ignore = colorize("✓", "yellow")
@@ -200,4 +203,5 @@ missing = colorize("✗", "orange")
 processed = colorize("✓✓", "green")
 
 log_format = "%(asctime)s %(levelname)-7s %(message)s"
-log_formatter = logging.Formatter(log_format)
+
+printer = None
