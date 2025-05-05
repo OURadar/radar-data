@@ -21,4 +21,4 @@ dummy_sweep = {
     },
 }
 
-radar.pprint(dummy_sweep)
+radar.print(dummy_sweep)

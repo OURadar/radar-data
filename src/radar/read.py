@@ -73,7 +73,7 @@ def _starts_with_cf(string):
     return bool(re.match(r"^cf", string, re.IGNORECASE))
 
 
-def _read_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
+def _read_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}, verbose=0):
     myname = colorize("radar._read_ncid()", "green")
     attrs = ncid.ncattrs()
     if verbose > 2:
@@ -115,7 +115,7 @@ def _get_variable_as_masked_float32(variables, name):
     return np.ma.array(variable.data, mask=variable.mask, dtype=np.float32, fill_value=np.nan)
 
 
-def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
+def _read_cf1_from_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}):
     longitude = float(ncid.variables["longitude"][0])
     latitude = float(ncid.variables["latitude"][0])
     attrs = ncid.ncattrs()
@@ -197,7 +197,7 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
 
 
 # TODO: Need to make this more generic
-def _read_cf2_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
+def _read_cf2_from_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}):
     site = ncid.getncattr("instrument_name")
     location = get_nexrad_location(site)
     if location:
@@ -320,7 +320,7 @@ def _quartet_to_tarinfo(quartet):
     return info
 
 
-def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
+def _read_tar(source, symbols={"Z", "V", "W", "D", "P", "R"}, tarinfo=None, want_tarinfo=False, verbose=0):
     myname = colorize("radar._read_tar()", "green")
     if tarinfo is None:
         tarinfo = read_tarinfo(source, verbose=verbose)
@@ -339,9 +339,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
             with Dataset("memory", memory=content) as ncid:
                 sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
-            for symbol in symbols:
-                if symbol not in tarinfo:
-                    continue
+            for symbol in symbols & set(tarinfo):
                 info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
                     if verbose > 1:
@@ -367,7 +365,7 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     return (sweep, tarinfo) if want_tarinfo else sweep
 
 
-def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
+def _read_nc(source, symbols={"Z", "V", "W", "D", "P", "R"}, verbose=0):
     myname = colorize("radar._read_nc()", "green")
     basename = os.path.basename(source)
     parts = re_4parts.search(basename)
@@ -414,7 +412,7 @@ def _read_nc(source, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
     return sweep
 
 
-def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], verbose=0):
+def _read_nexrad(source, sweep_index=0, symbols={"Z", "V", "W", "D", "P", "R"}, verbose=0):
     if verbose > 1:
         myname = colorize("radar._read_nexrad()", "green")
         logger.debug(f"{myname} {colorize(source, 'yellow')}")
@@ -519,14 +517,14 @@ def read(source, **kwargs):
 
     Optional keyword arguments:
     verbose: int - Verbosity level, default = 0
-    symbols: list of str, default = ["Z", "V", "W", "D", "P", "R"]
+    symbols: list of str, default = {"Z", "V", "W", "D", "P", "R"}
     finite: bool - Convert NaN to 0, default = False
     tarinfo: dict - Tarball information, default = None
     want_tarinfo: bool - Return tarinfo, default = False
     u8: bool - Convert values to uint8, default = False
     """
     verbose = kwargs.get("verbose", 0)
-    symbols = kwargs.get("symbols", ["Z", "V", "W", "D", "P", "R"])
+    symbols = kwargs.get("symbols", {"Z", "V", "W", "D", "P", "R"})
     finite = kwargs.get("finite", False)
     tarinfo = kwargs.get("tarinfo", None)
     want_tarinfo = kwargs.get("want_tarinfo", False)
