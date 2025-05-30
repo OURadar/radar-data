@@ -1,5 +1,4 @@
 import os
-import sys
 import urllib.request
 
 TEST_FILE_FOLDER = "data"
@@ -25,9 +24,10 @@ def download_data_if_not_exists():
             break
     if any_missing:
         print(f"Downloading test data ...")
-        url = f"https://radarhub/static/radar-data-test.txz"
+        url = f"https://radarhub.arrc.ou.edu/static/radar-data-test.txz"
         urllib.request.urlretrieve(url, "_radar-data-test.txz")
         print(f"Extracting test data ...")
+        os.makedirs(TEST_FILE_FOLDER, exist_ok=True)
         os.system(f"tar -x -v -C {TEST_FILE_FOLDER} -f _radar-data-test.txz")
         os.remove("_radar-data-test.txz")
 
@@ -36,10 +36,13 @@ def test_read():
     """
     Test the read function
     """
-    file_path = os.path.join(TEST_FILE_FOLDER, TEST_FILES[0])
-    data = radar.read(file_path)
-    assert data is not None, "Failed to read the file"
-    radar.print(data)
+    for file in TEST_FILES:
+        file = os.path.join(TEST_FILE_FOLDER, file)
+        print(f"Testing file {file}")
+        if not os.path.exists(file):
+            print(f"File {file} does not exist")
+            data = radar.read(file)
+            assert data is not None, "Failed to read the file"
 
 
 # Example usage

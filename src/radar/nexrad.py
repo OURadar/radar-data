@@ -84,7 +84,7 @@ re_parts_stripped = re.compile(
     + r"(?P<time>20\d{2}(0\d|1[012])([012]\d|3[01])-([01]\d|2[0-3])[0-5]\d[0-5]\d)-"
     + r"(?P<scan>\d+)-"
     + r"(?P<part>\d+)-"
-    + r"(?P<flag>[SIE])"
+    + r"(?P<flag>[SIEM])"
 )
 # Look for something like KTLX20250426_121335_V06
 re_parts_volume = re.compile(
