@@ -48,3 +48,9 @@ sweep = radar.read(file, sweep_index=1)
 ```shell
 python src/radar/service/datashop.py -v -H 10.197.14.52 -p 50001 -c 4 -t /mnt/data/PX1000/2024/20241219/_original
 ```
+
+## Tests
+
+```shell
+pytest -s
+```
