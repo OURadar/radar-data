@@ -1,6 +1,6 @@
 # Radar Data
 
-This is a collection of radar data readers that are in the NetCDF format
+This is a collection of radar data readers
 
 These formats are currently supported
 
@@ -11,13 +11,13 @@ These formats are currently supported
 - CF-Radial 2.0 (draft)
 - NEXRAD Level II
 
-## Install Using the Python Package-Management System
+## Installation
 
 ```shell
 pip install radar-data
 ```
 
-## Example Usage
+## Examples
 
 ```python
 import radar
@@ -45,11 +45,36 @@ sweep = radar.read(file, sweep_index=1)
 
 ## DataShop
 
-```shell
-python src/radar/service/datashop.py -v -H 10.197.14.52 -p 50001 -c 4 -t /mnt/data/PX1000/2024/20241219/_original
+A data server for multi-threaded reading. An example use case would be to abstract the file reading backend to this service so that multiple requests can be pipelined.
+
+```text
+usage: datashop [-h] [-c COUNT] [-d DIR] [-H HOST] [-p PORT] [-t TEST] [-v] [--delay] [--version] [source ...]
+
+Datashop
+
+Examples:
+    datashop -v settings.yaml
+    datashop -v -H 10.197.14.52 -p 50001 -c 4 -t /mnt/data/PX1000/2024/20241219/_original
+
+positional arguments:
+  source                configuration
+
+options:
+  -h, --help            show this help message and exit
+  -c COUNT, --count COUNT
+                        count
+  -d DIR, --dir DIR     directory
+  -H HOST, --host HOST  host
+  -p PORT, --port PORT  port
+  -t TEST, --test TEST  test using directory
+  -v                    increases verbosity
+  --delay               simulate request delays
+  --version             show program's version number and exit
 ```
 
-## Tests
+## Unit Tests
+
+To run a set of reading tests through `pytest`:
 
 ```shell
 pytest -s
