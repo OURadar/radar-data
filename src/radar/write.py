@@ -131,6 +131,8 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
         data = products.get(symbol)
         if data is None:
             return
+        if not np.ma.is_masked(data):
+            data = np.ma.masked_array(data, mask=np.isnan(data))
         standard_names = {
             "Z": "equivalent_reflectivity_factor",
             "V": "radial_velocity_of_scatterers_away_from_instrument",
@@ -201,6 +203,6 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
     ncid.time_coverage_end = end_timestring
     ncid.start_datetime = start_timestring
     ncid.end_datetime = end_timestring
-    ncid.created = datetime.datetime.now(utc).strftime(f"%Y-%m-%dT%H:%M:%S")
+    ncid.created = datetime.datetime.now(utc).strftime(f"%Y-%m-%dT%H:%M:%SZ")
     ncid.platform_is_mobile = "false"
     ncid.ray_times_increase = "true"
