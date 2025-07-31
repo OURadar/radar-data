@@ -34,47 +34,65 @@ def write(filename, sweep):
     logger.info(f"Finished writing {filename}.")
 
 
-def _write_cf1(ncid, sweep, string_length=32):
+def _write_cf1(ncid, sweep, string_length=32, period=20.0):
+    ray_count, gate_count = sweep["elevations"].shape[0], sweep["ranges"].shape[0]
+    start_datetime = datetime.datetime.fromtimestamp(sweep["time"]).replace(tzinfo=utc)
+    start_timestring = start_datetime.strftime(f"%Y-%m-%dT%H:%M:%SZ")
+    end_datetime = datetime.datetime.fromtimestamp(sweep.get("end_time", sweep["time"] + period)).replace(tzinfo=utc)
+    end_timestring = end_datetime.strftime(f"%Y-%m-%dT%H:%M:%SZ")
     # Dimensions
-    ncid.createDimension("time", sweep["elevations"].size)
-    ncid.createDimension("range", sweep["ranges"].size)
+    ncid.createDimension("time", ray_count)
+    ncid.createDimension("range", gate_count)
     ncid.createDimension("sweep", 1)
     ncid.createDimension("string_length", string_length)
     ncid.createDimension("r_calib", 1)
     # Variables
     volume_number = ncid.createVariable("volume_number", "i4")
     volume_number.long_name = "volume_index_number_0_based"
+    volume_number[:] = 0
     time_coverage_start = ncid.createVariable("time_coverage_start", "c", ("string_length",))
     time_coverage_start.standard_name = "data_volume_start_time_utc"
     time_coverage_start.comments = "ray times are relative to start time in secs"
+    time_coverage_start[:] = start_timestring.ljust(string_length)
     time_coverage_end = ncid.createVariable("time_coverage_end", "c", ("string_length",))
     time_coverage_end.standard_name = "data_volume_end_time_utc"
     time_coverage_end.comments = "ray times are relative to start time in secs"
+    time_coverage_end[:] = end_timestring.ljust(string_length)
     latitude = ncid.createVariable("latitude", "f8")
     latitude.standard_name = "latitude"
     latitude.units = "degrees_north"
+    latitude[:] = sweep["latitude"]
     longitude = ncid.createVariable("longitude", "f8")
     longitude.standard_name = "longitude"
     longitude.units = "degrees_east"
+    longitude[:] = sweep["longitude"]
     altitude = ncid.createVariable("altitude", "f8")
     altitude.units = "meters"
+    altitude.standard_name = "altitude"
+    altitude[:] = sweep.get("altitude", 0.0)
     sweep_number = ncid.createVariable("sweep_number", "i4", ("sweep",))
     sweep_number.long_name = "sweep_index_number_0_based"
+    sweep_number[:] = 0
     sweep_mode = ncid.createVariable("sweep_mode", "c", ("sweep", "string_length"))
     sweep_mode.long_name = "scan_mode_for_sweep"
+    sweep_mode[:] = "azimuth_surveillance".ljust(string_length)
     fixed_angle = ncid.createVariable("fixed_angle", "f4", ("sweep",))
     fixed_angle.long_name = "ray_target_fixed_angle"
     fixed_angle.units = "degrees"
+    fixed_angle[:] = sweep["sweepElevation"]
     sweep_start_ray_index = ncid.createVariable("sweep_start_ray_index", "i4", ("sweep",))
     sweep_start_ray_index.long_name = "index_of_first_ray_in_sweep"
+    sweep_start_ray_index[:] = 0
     sweep_end_ray_index = ncid.createVariable("sweep_end_ray_index", "i4", ("sweep",))
     sweep_end_ray_index.long_name = "index_of_last_ray_in_sweep"
+    sweep_end_ray_index[:] = ray_count - 1
 
     time = ncid.createVariable("time", "f8", ("time",))
     time.standard_name = "time"
     time.long_name = "time_in_seconds_since_volume_start"
-    time.units = f"seconds since {datetime.datetime.fromtimestamp(sweep['time']).strftime(f'%Y-%m-%dT%H:%M:%SZ')}"
+    time.units = f"seconds since {start_timestring}"
     time.calendar = "gregorian"
+    time[:] = sweep.get("times", np.linspace(0, period - period / ray_count, ray_count))
     rr = ncid.createVariable("range", "f4", ("range",))
     rr.standard_name = "projection_range_coordinate"
     rr.long_name = "range_to_measurement_volume"
@@ -100,10 +118,12 @@ def _write_cf1(ncid, sweep, string_length=32):
     pulse_width.long_name = "transmitter_pulse_width"
     pulse_width.units = "seconds"
     pulse_width.meta_group = "instrument_parameters"
+    pulse_width[:] = sweep.get("pulsewidth", 0.0001)
     prt = ncid.createVariable("prt", "f4", ("time",))
     prt.long_name = "pulse repetition time"
     prt.units = "seconds"
     prt.meta_group = "instrument_parameters"
+    prt[:] = sweep.get("prt", 1.0 / sweep.get("prf", 0.001))
 
     products = sweep.get("products")
 
@@ -167,8 +187,6 @@ def _write_cf1(ncid, sweep, string_length=32):
     r_calib_system_phidp.meta_group = "radar_calibration"
 
     # Global attributes
-    coverage_start = datetime.datetime.fromtimestamp(sweep["time"]).strftime(f"%Y-%m-%dT%H:%M:%SZ")
-    coverage_end = datetime.datetime.fromtimestamp(sweep["time"] + 20).strftime(f"%Y-%m-%dT%H:%M:%SZ")
     ncid.Conventions = "CF-1.7"
     ncid.Sub_conventions = "CF-Radial instrument_parameters radar_calibration"
     ncid.version = "CF-Radial-1.4"
@@ -179,21 +197,10 @@ def _write_cf1(ncid, sweep, string_length=32):
     ncid.references = ""
     ncid.comment = f"Radar Data"
     ncid.instrument_name = ""
-    ncid.time_coverage_start = coverage_start
-    ncid.time_coverage_end = coverage_end
-    ncid.start_datetime = coverage_start
-    ncid.end_datetime = coverage_end
+    ncid.time_coverage_start = start_timestring
+    ncid.time_coverage_end = end_timestring
+    ncid.start_datetime = start_timestring
+    ncid.end_datetime = end_timestring
     ncid.created = datetime.datetime.now(utc).strftime(f"%Y-%m-%dT%H:%M:%S")
     ncid.platform_is_mobile = "false"
     ncid.ray_times_increase = "true"
-
-    volume_number[:] = 0
-    latitude[:] = sweep["latitude"]
-    longitude[:] = sweep["longitude"]
-    altitude[:] = sweep.get("altitude", 0)
-    sweep_number[:] = 0
-    sweep_mode[:] = "azimuth_surveillance".ljust(string_length)
-    fixed_angle[:] = sweep["sweepElevation"]
-
-    prt[:] = sweep.get("prt", 1.0 / sweep.get("prf", 0.001))
-    pulse_width[:] = sweep.get("pulseWidth", 0.0001)
