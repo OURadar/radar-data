@@ -11,7 +11,6 @@ description = "Radar Data"
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["radar", "data", "weather"]
-license = "MIT"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
