@@ -21,19 +21,6 @@ np.set_printoptions(precision=2, suppress=True, threshold=10)
 EPOCH_DATETIME_UTC = datetime.datetime(1970, 1, 1, tzinfo=utc)
 
 
-class Kind:
-    UNK = "U"
-    CF1 = "1"
-    CF2 = "2"
-    M31 = "31"
-    WDS = "W"
-
-
-class TxRx:
-    BISTATIC = "B"
-    MONOSTATIC = "M"
-
-
 """
     Value to index conversion using RadarKit convention
 """
@@ -164,7 +151,9 @@ def _read_cf1_from_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}):
     waveform = "u"
     gatewidth = 100.0
     if "prt" in variables:
-        prf = round(1.0 / variables["prt"][:][0], 1)
+        prf = round(1.0 / float(variables["prt"][:][0]), 1)
+    elif "prf" in variables:
+        prf = round(float(variables["prf"][:][0]), 1)
     if "radarkit_parameters" in ncid.groups:
         group = ncid.groups["radarkit_parameters"]
         attrs = group.ncattrs()
@@ -172,12 +161,11 @@ def _read_cf1_from_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}):
             waveform = group.getncattr("waveform")
         if "prt" in attrs:
             prf = round(float(group.getncattr("prf")), 1)
+    ranges = np.array(variables["range"][:], dtype=np.float32)
     if "meters_between_gates" in variables["range"]:
         gatewidth = float(variables["range"].getncattr("meters_between_gates"))
     else:
-        ranges = np.array(variables["range"][:2], dtype=float)
-        gatewidth = ranges[1] - ranges[0]
-    ranges = np.array(variables["range"][:], dtype=np.float32)
+        gatewidth = float(ranges[1] - ranges[0])
     return {
         "kind": Kind.CF1,
         "txrx": TxRx.MONOSTATIC,
@@ -425,11 +413,11 @@ def _read_nexrad(source, sweep_index=0, symbols={"Z", "V", "W", "D", "P", "R"}, 
     max_gates = min([data[p].ngates for p in products])
     r0 = data["REF"].r0
     dr = data["REF"].dr
-    rr = np.arange(r0, r0 + max_gates * dr, dr)
-    ee = np.zeros(nrays, ">f4")
-    aa = np.zeros(nrays, ">f4")
-    days = np.zeros(nrays, ">i4")
-    secs = np.zeros(nrays, ">i4")
+    rr = np.arange(r0, r0 + max_gates * dr, dr, dtype=np.float32)
+    ee = np.zeros(nrays, dtype=np.float32)
+    aa = np.zeros(nrays, dtype=np.float32)
+    days = np.zeros(nrays, dtype=np.int32)
+    secs = np.zeros(nrays, dtype=np.int32)
     for k, msg in enumerate(msg31):
         data_header = msg.head
         ee[k] = data_header.elevation_angle
@@ -470,9 +458,9 @@ def _read_nexrad(source, sweep_index=0, symbols={"Z", "V", "W", "D", "P", "R"}, 
         "longitude": data["VOL"].longitude,
         "sweepElevation": vcp.data[sweep_index].elevation_angle,
         "sweepAzimuth": 0.0,
-        "prf": msg31[0].prf,
+        "prf": float(msg31[0].prf),
         "waveform": "u",
-        "gatewidth": data["REF"].dr,
+        "gatewidth": float(data["REF"].dr),
         "elevations": ee,
         "azimuths": aa,
         "ranges": rr,

@@ -38,3 +38,16 @@ empty_sweep = {
     "values": {"U": np.empty((0, 0), dtype=np.float32)},
     "u8": {"U": np.empty((0, 0), dtype=np.uint8)},
 }
+
+
+class Kind:
+    UNK = "U"
+    CF1 = "1"
+    CF2 = "2"
+    M31 = "31"
+    WDS = "W"
+
+
+class TxRx:
+    BISTATIC = "B"
+    MONOSTATIC = "M"
