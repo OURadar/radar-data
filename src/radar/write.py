@@ -165,7 +165,6 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
         var.scale_factor = scale_factors[symbol]
         var.add_offset = np.single(0.0)
         var.coordinates = "time range"
-        data.set_fill_value(var._FillValue)
         var[:] = data
 
     _define_and_set_data("Z", "DBZ")
