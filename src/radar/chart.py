@@ -72,7 +72,7 @@ def ribbon():
 
 
 class Chart:
-    size = (1280, 720)
+    size = (1920, 1080)
     seed = 111
     dpi = 72
     s = 1.0
@@ -418,7 +418,7 @@ class Chart:
                 ymax = kwargs["ymax"]
                 self.set_ylim(-ymax, ymax)
             if "xmax" not in kwargs and "ymax" not in kwargs and self.axis_is_set is False:
-                rmax = kwargs.get("rmax", np.hypot(np.max(np.abs(xx)), np.max(np.abs(yy))))
+                rmax = kwargs.get("rmax", 0.8 * np.hypot(np.max(np.abs(xx)), np.max(np.abs(yy))))
                 xoff = kwargs.get("xoff", 0.0)
                 yoff = kwargs.get("yoff", 0.0)
                 aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
