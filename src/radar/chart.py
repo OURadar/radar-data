@@ -570,13 +570,12 @@ class _ChartLayout:
         de = sweep["elevations"][-1] - sweep["elevations"][-2]
         da = sweep["azimuths"][-1] - sweep["azimuths"][-2]
         dr = sweep["ranges"][-1] - sweep["ranges"][-2]
-        blob = hashlib.sha1(
+        blob = hashlib.md5(
             f"""
             E_{sweep["elevations"][0]:.3f}_{sweep["elevations"][-1]:.3f}_{de:.3f}
             A_{sweep["azimuths"][0]:.3f}_{sweep["azimuths"][-1]:.3f}_{da:.3f}
             R_{sweep["ranges"][0]:.3f}_{sweep["ranges"][-1]:.3f}_{dr:.3f}
             """.encode(),
-            usedforsecurity=False,
         ).hexdigest()[-16:]
         if kwargs.get("verbose", 0) > 1:
             print(f"Coord hash: {blob}")
