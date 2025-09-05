@@ -1,8 +1,8 @@
 # Radar Data
 
-This is a collection of radar data readers
+This is a collection of radar data readers and CF-Radial writer.
 
-These formats are currently supported
+Supported input formats:
 
 - WDSS-II
 - CF-Radial 1.3 / CF-1.6
@@ -10,6 +10,10 @@ These formats are currently supported
 - CF-Radial 1.4 / CF-1.7
 - CF-Radial 2.0 (draft)
 - NEXRAD Level II
+
+Supported output format:
+
+- CF-Radial 1.4
 
 ## Installation
 
@@ -41,6 +45,9 @@ sweep = radar.read(file, sweep_index=1)
 # NEXRAD complete volume
 file = os.path.expanduser("~/Downloads/data/KTLX/20250503/KTLX20250503_122438_V06")
 sweep = radar.read(file, sweep_index=1)
+
+# Writing a CF-Radial file
+radar.write("output-file.nc", sweep)
 ```
 
 ## DataShop
