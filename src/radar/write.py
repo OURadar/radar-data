@@ -165,6 +165,11 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
         var.scale_factor = scale_factors[symbol]
         var.add_offset = np.single(0.0)
         var.coordinates = "time range"
+        # P should always in degrees 0-360
+        if symbol == "P":
+            pmax = np.max(sweep["products"]["P"])
+            if pmax > 0.0 and pmax < 3.142:
+                data = data * 180.0 / np.pi
         var[:] = data
 
     _define_and_set_data("Z", "DBZ")
