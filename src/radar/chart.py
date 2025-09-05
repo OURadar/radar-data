@@ -1,12 +1,11 @@
-from . import overlay
-
+import blib
 import hashlib
 import datetime
 import numpy as np
 import matplotlib.patheffects
 import matplotlib.pyplot as plt
 
-import blib
+from . import overlay
 
 
 def rho2ind(values):
@@ -71,7 +70,7 @@ def ribbon():
     return z
 
 
-class Chart:
+class _ChartLayout:
     size = (1920, 1080)
     seed = 111
     dpi = 72
@@ -91,6 +90,7 @@ class Chart:
     labelfont = blib.getFontOfWeight(weight=600)
     titlefont = blib.getFontOfWeight(weight=700)
     symbols = []
+    diag = 100.0
 
     def __init__(self, n=1, **kwargs):
         """
@@ -333,6 +333,44 @@ class Chart:
             st.set(size=self.captionsize, path_effects=self.path_effects)
         return ax, cb, st
 
+    def _update_limits(self, mode, diag, **kwargs):
+        if (
+            self.axis_is_set
+            and "rmax" not in kwargs
+            and "xmax" not in kwargs
+            and "ymax" not in kwargs
+            and "xoff" not in kwargs
+            and "yoff" not in kwargs
+        ):
+            return
+        if mode == "rhi":
+            if "xmax" in kwargs:
+                self.set_xlim(0, kwargs["xmax"])
+            if "ymax" in kwargs:
+                self.set_ylim(0, kwargs["ymax"])
+        else:
+            if "xmax" in kwargs:
+                xmax = kwargs["xmax"]
+                self.set_xlim(-xmax, xmax)
+            if "ymax" in kwargs:
+                ymax = kwargs["ymax"]
+                self.set_ylim(-ymax, ymax)
+            if "xmax" not in kwargs and "ymax" not in kwargs:
+                if diag is not None:
+                    self.diag = diag
+                rmax = kwargs.get("rmax", 0.6 * self.diag)
+                xoff = kwargs.get("xoff", 0.0)
+                yoff = kwargs.get("yoff", 0.0)
+                aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
+                if aspect > 1:
+                    self.set_xlim(-rmax * aspect - xoff, rmax * aspect - xoff)
+                    self.set_ylim(-rmax - yoff, rmax - yoff)
+                else:
+                    self.set_xlim(-rmax - xoff, rmax - xoff)
+                    self.set_ylim(-rmax / aspect - yoff, rmax / aspect - yoff)
+        if "xmax" in kwargs or "ymax" in kwargs or "rmax" in kwargs or "xoff" in kwargs or "yoff" in kwargs:
+            self.axis_is_set = True
+
     def _update_data_only(self, sweep: dict, **kwargs):
         if "symbol" in kwargs:
             symbols = list([kwargs["symbol"]])
@@ -344,6 +382,7 @@ class Chart:
                 m.set_array(rho2ind(sweep["products"][symbol]).ravel())
                 continue
             m.set_array(sweep["products"][symbol].ravel())
+        self._update_limits(sweep["sweepMode"], None, **kwargs)
         if "title" in kwargs:
             self.update_title(kwargs.get("title"))
 
@@ -404,33 +443,10 @@ class Chart:
                 vmin = kwargs.get("vmin", np.min(value.flatten()))
                 vmax = kwargs.get("vmax", np.max(value.flatten()))
             self.ms[k] = ax.pcolormesh(xx, yy, value, cmap=cmap, vmin=vmin, vmax=vmax, **props)
-
-        if sweep["sweepMode"] == "rhi":
-            if "xmax" in kwargs:
-                self.set_xlim(0, kwargs["xmax"])
-            if "ymax" in kwargs:
-                self.set_ylim(0, kwargs["ymax"])
-        else:
-            if "xmax" in kwargs:
-                xmax = kwargs["xmax"]
-                self.set_xlim(-xmax, xmax)
-            if "ymax" in kwargs:
-                ymax = kwargs["ymax"]
-                self.set_ylim(-ymax, ymax)
-            if "xmax" not in kwargs and "ymax" not in kwargs and self.axis_is_set is False:
-                rmax = kwargs.get("rmax", 0.8 * np.hypot(np.max(np.abs(xx)), np.max(np.abs(yy))))
-                xoff = kwargs.get("xoff", 0.0)
-                yoff = kwargs.get("yoff", 0.0)
-                aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
-                if aspect > 1:
-                    self.set_xlim(-rmax * aspect + xoff, rmax * aspect + xoff)
-                    self.set_ylim(-rmax + yoff, rmax + yoff)
-                else:
-                    self.set_xlim(-rmax + xoff, rmax + xoff)
-                    self.set_ylim(-rmax / aspect + yoff, rmax / aspect + yoff)
-                self.axis_is_set = True
+        self._update_limits(sweep["sweepMode"], np.hypot(np.max(np.abs(xx)), np.max(np.abs(yy))), **kwargs)
 
     def _setup_colorbars(self, **kwargs):
+        plt.figure(self.fig)
         # Colorbars
         for m, a, c in zip(self.ms, self.ax, self.cb):
             plt.colorbar(m, cax=c, ax=a, orientation=self.orientation)
@@ -453,12 +469,12 @@ class Chart:
 
         # Colorbar ticks
         tick_props = {
+            "path_effects": self.path_effects,
             "fontproperties": self.labelfont,
             "fontsize": self.labelsize,
-            "path_effects": self.path_effects,
         }
 
-        def setup_ticks(k, ticks, ticklabels, lo, hi):
+        def _setup_ticks(k, ticks, ticklabels, lo, hi):
             if self.orientation == "vertical":
                 self.cb[k].set_yticks(ticks, labels=ticklabels, **tick_props)
                 self.cb[k].set_ylim(lo, hi)
@@ -469,29 +485,29 @@ class Chart:
         for k, symbol in enumerate(self.symbols[: len(self.ax)]):
             if "map" in kwargs:
                 ticks = kwargs.get("ticks", np.linspace(kwargs["vmin"], kwargs["vmax"], 5))
-                setup_ticks(k, kwargs["map"](ticks), ticks, kwargs["vmin"], kwargs["vmax"])
+                _setup_ticks(k, kwargs["map"](ticks), ticks, kwargs["vmin"], kwargs["vmax"])
                 continue
             elif symbol[0] == "Z":
                 ticks = np.arange(-20, 61, 20)
-                setup_ticks(k, ticks, ticks, -10, 75)
+                _setup_ticks(k, ticks, ticks, -10, 75)
             elif symbol[0] == "V":
                 ticks = np.arange(-20, 21, 10)
-                setup_ticks(k, ticks, ticks, -30, 30)
+                _setup_ticks(k, ticks, ticks, -30, 30)
             elif symbol[0] == "W":
                 ticks = np.arange(2, 9, 2)
-                setup_ticks(k, ticks, ticks, 0, 10)
+                _setup_ticks(k, ticks, ticks, 0, 10)
             elif symbol == "P":
                 ticks = np.arange(-120, 121, 60)
-                setup_ticks(k, ticks, ticks, -180, 180)
+                _setup_ticks(k, ticks, ticks, -180, 180)
             elif symbol == "D":
                 ticks = np.arange(-4, 5, 2)
-                setup_ticks(k, ticks, ticks, -6, 6)
+                _setup_ticks(k, ticks, ticks, -6, 6)
             elif symbol == "R":
                 ticks = np.array([0.73, 0.83, 0.93, 0.96, 0.99, 1.02])
-                setup_ticks(k, rho2ind(ticks), ticks, 0, 180)
+                _setup_ticks(k, rho2ind(ticks), ticks, 0, 180)
             elif symbol == "RR":
                 ticks = np.array([0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50])
-                setup_ticks(k, np.log10(ticks), ticks, -1, 2)
+                _setup_ticks(k, np.log10(ticks), ticks, -1, 2)
 
     def update_title(self, text):
         if self.title is None:
@@ -534,8 +550,6 @@ class Chart:
         self.title = self.fig.text(0.5, y, text, **title_props)
 
     def set_data(self, sweep: dict, **kwargs):
-        if kwargs.get("verbose", 0) > 1:
-            print("Chart.set_data() called with kwargs:", kwargs)
         """
         Set the data for the chart.
 
@@ -546,17 +560,21 @@ class Chart:
         xoff: float
         yoff: float
         """
+        if kwargs.get("verbose", 0) > 1:
+            print("Chart.set_data() called with kwargs:", kwargs)
+        # Make sure sweep contains the following keys:
+        required_keys = ["sweepMode", "elevations", "azimuths", "ranges", "products", "time"]
+        for key in required_keys:
+            if key not in sweep:
+                raise ValueError(f"sweep is missing required key: {key}")
         de = sweep["elevations"][-1] - sweep["elevations"][-2]
         da = sweep["azimuths"][-1] - sweep["azimuths"][-2]
         dr = sweep["ranges"][-1] - sweep["ranges"][-2]
-        ee = np.radians(np.concatenate((sweep["elevations"], [sweep["elevations"][-1] + de])))
-        aa = np.radians(np.concatenate((sweep["azimuths"], [sweep["azimuths"][-1] + da])))
-        rr = np.concatenate((sweep["ranges"], [sweep["ranges"][-1] + dr]))
         blob = hashlib.sha1(
             f"""
-            E_{ee[0]:.3f}_{ee[-1]:.3f}_{de:.3f}
-            A_{aa[0]:.3f}_{aa[-1]:.3f}_{da:.3f}
-            R_{rr[0]:.3f}_{rr[-1]:.3f}_{dr:.3f}
+            E_{sweep["elevations"][0]:.3f}_{sweep["elevations"][-1]:.3f}_{de:.3f}
+            A_{sweep["azimuths"][0]:.3f}_{sweep["azimuths"][-1]:.3f}_{da:.3f}
+            R_{sweep["ranges"][0]:.3f}_{sweep["ranges"][-1]:.3f}_{dr:.3f}
             """.encode(),
             usedforsecurity=False,
         ).hexdigest()[-16:]
@@ -566,6 +584,10 @@ class Chart:
         if self.hash == blob and all([m is not None for m in self.ms]) and "symbol" not in kwargs:
             return self._update_data_only(sweep, **kwargs)
         self.hash = blob
+        # Pcolormesh needs one more value in each dimension
+        ee = np.radians(np.concatenate((sweep["elevations"], [sweep["elevations"][-1] + de])))
+        aa = np.radians(np.concatenate((sweep["azimuths"], [sweep["azimuths"][-1] + da])))
+        rr = np.concatenate((sweep["ranges"], [sweep["ranges"][-1] + dr]))
 
         if sweep["sweepMode"] == "rhi":
 
@@ -633,7 +655,7 @@ class Chart:
         plt.close(self.fig)
 
 
-class ChartRHI(Chart):
+class ChartRHI(_ChartLayout):
     seed = 231
 
     def __init__(self, sweep: dict = None, **kwargs):
@@ -660,7 +682,7 @@ class ChartRHI(Chart):
             self.set_data(sweep, **kwargs)
 
 
-class ChartPPI(Chart):
+class ChartPPI(_ChartLayout):
     seed = 321
 
     def __init__(self, sweep: dict = None, **kwargs):
@@ -688,10 +710,31 @@ class ChartPPI(Chart):
         if sweep:
             self.set_data(sweep, **kwargs)
 
+    def _set_limits(self, **kwargs):
+        if "xmax" in kwargs:
+            xmax = kwargs["xmax"]
+            self.set_xlim(-xmax, xmax)
+        if "ymax" in kwargs:
+            ymax = kwargs["ymax"]
+            self.set_ylim(-ymax, ymax)
+        if "xmax" not in kwargs and "ymax" not in kwargs and self.axis_is_set is False:
+            diag = np.hypot(np.max(np.abs(xx)), np.max(np.abs(yy)))
+            rmax = kwargs.get("rmax", 0.6 * diag)
+            xoff = kwargs.get("xoff", 0.0)
+            yoff = kwargs.get("yoff", 0.0)
+            aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
+            if aspect > 1:
+                self.set_xlim(-rmax * aspect - xoff, rmax * aspect - xoff)
+                self.set_ylim(-rmax + yoff, rmax + yoff)
+            else:
+                self.set_xlim(-rmax - xoff, rmax - xoff)
+                self.set_ylim(-rmax / aspect + yoff, rmax / aspect + yoff)
+            self.axis_is_set = True
+
     def set(self, **kwargs):
         if "rmax" in kwargs:
-            aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
             rmax = kwargs["rmax"]
+            aspect = self.ax[0].bbox.width / self.ax[0].bbox.height
             if aspect < 1:
                 for ax in self.ax:
                     ax.set(xlim=(-rmax, rmax), ylim=(-rmax * aspect, rmax * aspect))
@@ -715,7 +758,7 @@ class ChartRHIWide(ChartRHI):
     size = (3840, 250)
 
 
-class ChartSinglePPI(Chart):
+class ChartSinglePPI(_ChartLayout):
     size = (1920, 1080)
     seed = 111
     s = 1.25

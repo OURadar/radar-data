@@ -171,15 +171,6 @@ def radii(max_range=70.0, about=7):
 
 
 class Grid:
-    c = matplotlib.colors.to_rgb(matplotlib.rcParams["axes.facecolor"])
-    path_effects = [matplotlib.patheffects.Stroke(linewidth=2.5, foreground=(*c, 0.6)), matplotlib.patheffects.Normal()]
-    label_props = {
-        "fontproperties": blib.getFontOfWeight(weight=600),
-        "horizontalalignment": "center",
-        "verticalalignment": "center",
-        "path_effects": path_effects,
-        "zorder": 200,
-    }
     s = 1
     size1 = 12
     size2 = 14
@@ -207,13 +198,20 @@ class Grid:
             self.size1 = 12 * self.s
             self.size2 = 14 * self.s
             self.size3 = 16 * self.s
-            c = matplotlib.colors.to_rgb(matplotlib.rcParams["axes.facecolor"])
-            self.label_props["path_effects"] = [
-                matplotlib.patheffects.Stroke(linewidth=2.5 * self.s, foreground=(*c, 0.6)),
-                matplotlib.patheffects.Normal(),
-            ]
-        self.gridwidth = kwargs.get("gridwidth", max(1.0, self.s))
-        self.linewidth = kwargs.get("linewidth", max(1.0, 1.5 * self.s))
+            self.gridwidth = kwargs.get("gridwidth", max(1.0, self.s))
+            self.linewidth = kwargs.get("linewidth", max(1.0, 1.5 * self.s))
+        c = matplotlib.colors.to_rgb(matplotlib.rcParams["axes.facecolor"])
+        self.path_effects = [
+            matplotlib.patheffects.Stroke(linewidth=2.5 * self.s, foreground=(*c, 0.7)),
+            matplotlib.patheffects.Normal(),
+        ]
+        self.label_props = {
+            "fontproperties": blib.getFontOfWeight(weight=600),
+            "horizontalalignment": "center",
+            "verticalalignment": "center",
+            "path_effects": self.path_effects,
+            "zorder": 200,
+        }
 
 
 """

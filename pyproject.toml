@@ -4,9 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radar-data"
-authors = [
-    {name = "Boonleng Cheong", email = "boonleng@ou.edu"},
-]
+authors = [{name = "Boonleng Cheong", email = "boonleng@ou.edu"}]
 description = "Radar Data"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -36,10 +34,13 @@ Repository = "https://github.com/ouradar/radar-data"
 datashop = "radar.datashop:main"
 
 [tool.setuptools]
-include-package-data = true
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"radar" = ["maps/*.json"]
 
 [tool.setuptools.dynamic]
 version = {attr = "radar.__version__"}
