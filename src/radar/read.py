@@ -92,7 +92,7 @@ def _read_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}, verbose=0):
         if verbose > 1:
             createdBy = ncid.getncattr("CreatedBy")
             logger.debug(f"{myname} WDSS-II {sep} {createdBy}")
-        return _read_wds_from_ncid(ncid)
+        return _read_wds_from_ncid(ncid, verbose=verbose)
     else:
         raise ValueError(f"{myname} Unidentified NetCDF format")
 
@@ -251,7 +251,7 @@ def _read_cf2_from_ncid(ncid, symbols={"Z", "V", "W", "D", "P", "R"}):
     }
 
 
-def _read_wds_from_ncid(ncid):
+def _read_wds_from_ncid(ncid, verbose=0):
     name = ncid.getncattr("TypeName")
     attrs = ncid.ncattrs()
     variables = ncid.variables
@@ -266,21 +266,27 @@ def _read_wds_from_ncid(ncid):
         r0, nr, dr = 0.0, ncid.dimensions["Gate"].size, 1.0
     ranges = r0 + np.arange(nr, dtype=np.float32) * dr
     values = np.array(variables[name][:], dtype=np.float32)
-    values[values < -90] = np.nan
+    if name == "PhiDP":
+        max_value = np.nanmax(values)
+        if max_value < 3.142:
+            if verbose > 0:
+                print(f"Converting {name} to degrees   max(PhiDP) = {max_value:.3f}")
+            values = values * 180.0 / np.pi
+    values[values < -900] = np.nan
     scantime = EPOCH_DATETIME_UTC + datetime.timedelta(seconds=int(ncid.getncattr("Time")))
     timestamp = scantime.timestamp()
-    if name == "RhoHV":
-        symbol = "R"
-    elif name == "PhiDP":
-        symbol = "P"
-    elif name == "Differential_Reflectivity":
-        symbol = "D"
-    elif name == "Width":
-        symbol = "W"
+    if name == "Intensity" or name == "Corrected_Intensity" or name == "Reflectivity":
+        symbol = "Z"
     elif name == "Radial_Velocity" or name == "Velocity":
         symbol = "V"
-    elif name == "Intensity" or name == "Corrected_Intensity" or name == "Reflectivity":
-        symbol = "Z"
+    elif name == "Width":
+        symbol = "W"
+    elif name == "Differential_Reflectivity":
+        symbol = "D"
+    elif name == "PhiDP":
+        symbol = "P"
+    elif name == "RhoHV":
+        symbol = "R"
     else:
         symbol = "U"
     return {
@@ -311,7 +317,7 @@ def _quartet_to_tarinfo(quartet):
     return info
 
 
-def _read_tar(source, symbols={"Z", "V", "W", "D", "P", "R"}, tarinfo=None, want_tarinfo=False, verbose=0):
+def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want_tarinfo=False, verbose=0):
     myname = colorize("radar._read_tar()", "green")
     if tarinfo is None:
         tarinfo = read_tarinfo(source, verbose=verbose)
@@ -330,7 +336,8 @@ def _read_tar(source, symbols={"Z", "V", "W", "D", "P", "R"}, tarinfo=None, want
             with Dataset("memory", memory=content) as ncid:
                 sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
-            for symbol in symbols & set(tarinfo):
+            available_symbols = [s for s in symbols if s in tarinfo]
+            for symbol in available_symbols:
                 info = _quartet_to_tarinfo(tarinfo[symbol])
                 with aid.extractfile(info) as fid:
                     if verbose > 1:
@@ -509,14 +516,14 @@ def read(source, **kwargs):
 
     Optional keyword arguments:
     verbose: int - Verbosity level, default = 0
-    symbols: list of str, default = {"Z", "V", "W", "D", "P", "R"}
+    symbols: list of str, default = ["Z", "V", "W", "D", "P", "R"]
     finite: bool - Convert NaN to 0, default = False
     tarinfo: dict - Tarball information, default = None
     want_tarinfo: bool - Return tarinfo, default = False
     u8: bool - Convert values to uint8, default = False
     """
     verbose = kwargs.get("verbose", 0)
-    symbols = kwargs.get("symbols", {"Z", "V", "W", "D", "P", "R"})
+    symbols = kwargs.get("symbols", ["Z", "V", "W", "D", "P", "R"])
     finite = kwargs.get("finite", False)
     tarinfo = kwargs.get("tarinfo", None)
     want_tarinfo = kwargs.get("want_tarinfo", False)
