@@ -1,6 +1,6 @@
 # Radar Data
 
-This is a collection of radar data readers and CF-Radial writer.
+This is a collection of radar data readers, a CF-Radial radar data writer, and charting routines.
 
 Supported input formats:
 
@@ -48,6 +48,34 @@ sweep = radar.read(file, sweep_index=1)
 
 # Writing a CF-Radial file
 radar.write("output-file.nc", sweep)
+```
+
+To draw a chart:
+```python
+import radar
+import radar.chart
+
+# Read a sweep as before
+sweep = radar.read(file)
+
+# You can initialize a chart without data
+chart = radar.chart.ChartPPI()
+
+# You can also pass it the sweep
+chart = radar.chart.ChartPPI(sweep)
+
+# You can replace the content of the chart
+chart.set_data(sweep)
+
+# Some customizations:
+chart.set_data(sweep, rmax=60, xoff=-10, yoff=-10)
+
+# If, for some reasons, the chart does not show up, the figure is
+chart.fig
+
+# You can save the figure as an image using the matplotlib figure.savefig
+chart.fig.savefir(FILENAME)
+
 ```
 
 ## DataShop
