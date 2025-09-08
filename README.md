@@ -78,6 +78,8 @@ chart.fig.savefir(FILENAME)
 
 ```
 
+![Figure](https://raw.githubusercontent.com/OURadar/radar-data/refs/heads/main/blob/ppi.png)
+
 ## DataShop
 
 A data server for multi-threaded reading. An example use case would be to abstract the file reading backend to this service so that multiple requests can be pipelined.
