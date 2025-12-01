@@ -1,5 +1,4 @@
 import os
-import re
 import logging
 import datetime
 import numpy as np
@@ -15,7 +14,7 @@ logger = logging.getLogger("radar-data")
 dot_colors = ["black", "gray", "blue", "green", "orange"]
 
 
-def write(filename, sweep):
+def write(filename: str, sweep: dict):
     """
     Write a radar sweep to a netCDF file.
     """
