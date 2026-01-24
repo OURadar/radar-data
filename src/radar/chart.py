@@ -530,7 +530,8 @@ class _ChartLayout:
     def update_title(self, text):
         if self.title is None:
             return self.set_title(text)
-        if self.title.get_horizontalalignment() != "left" or len(self.title.get_text()) != len(text):
+        if self.title.get_horizontalalignment() == "center" and len(self.title.get_text()) == len(text):
+            # For center-aligned titles, changing the text may cause jitter in animations
             extent = self.title.get_window_extent()
             self.title.remove()
             # Do a test run to get the proper position of the title, then use left alignment to avoid jitters in animations
@@ -809,22 +810,7 @@ class ChartSinglePPI(_ChartLayout):
         ]
 
         def get_colorbar_rect():
-            if self.orientation == "horizontal":
-                ch = round(16.0 * self.s)  # Colorbar height
-                pw = round(25.0 * self.s)  # Colorbar padding width
-                ph = round(12.0 * self.s)  # Colorbar padding height
-                cw = round(512 * self.s)  # Colorbar width
-                # Reserve 100 pts for the big symbol
-                while cw > self.size[0] - self.s * 100:
-                    cw -= 128 if self.size[0] < 640 else 256
-                rect = [
-                    (self.size[0] - cw - pw) / self.size[0],
-                    (self.size[1] - ch - ph - self.captionsize) / self.size[1],
-                    cw / self.size[0],
-                    ch / self.size[1],
-                ]
-                return rect
-            else:
+            if self.orientation == "vertical":
                 cw = round(16.0 * self.s)  # Colorbar width
                 pw = round(150.0 * self.s)  # Colorbar padding width
                 ph = round(50.0 * self.s)  # Colorbar padding height
@@ -839,6 +825,21 @@ class ChartSinglePPI(_ChartLayout):
                     ch / self.size[1],
                 ]
                 return rect
+
+            ch = round(16.0 * self.s)  # Colorbar height
+            pw = round(25.0 * self.s)  # Colorbar padding width
+            ph = round(12.0 * self.s)  # Colorbar padding height
+            cw = round(512 * self.s)  # Colorbar width
+            # Reserve 100 pts for the big symbol
+            while cw > self.size[0] - self.s * 100:
+                cw -= 128 if self.size[0] < 640 else 256
+            rect = [
+                (self.size[0] - cw - pw) / self.size[0],
+                (self.size[1] - ch - ph - self.captionsize) / self.size[1],
+                cw / self.size[0],
+                ch / self.size[1],
+            ]
+            return rect
 
         with plt.rc_context(self.figprops):
             width, height = self.size
@@ -858,14 +859,14 @@ class ChartSinglePPI(_ChartLayout):
             # Axis to darken the edges
             if self.orientation == "vertical":
                 shade_color = matplotlib.colors.to_rgb(matplotlib.rcParams["axes.facecolor"])
-                w = 0.25 * width
+                w = 0.3 * width
                 bq = [
                     1.0 - w / width,
                     0.0,
                     w / width,
                     1.0,
                 ]
-                z = shade((int(w), height), (0.5, 0.5), [*shade_color, 0.6], direction="se")
+                z = shade((int(w), height), (0.6, 0.35), [*shade_color, 0.65], direction="se")
                 # Axis for background shade
                 bx = self.fig.add_axes(bq, frameon=False, snap=True)
                 bx.imshow(z, aspect="auto")
@@ -899,8 +900,8 @@ class ChartSinglePPI(_ChartLayout):
                 "verticalalignment": "top",
                 "path_effects": self.path_effects,
             }
-            x = 25.0 * self.s / self.size[0]
-            y = 1.0 - 0.58 * (h - self.titlesize / self.size[1])
+            x = 25.0 * self.s / width
+            y = 1.0 - 0.58 * (h - self.titlesize / height)
             self.title = self.fig.text(x, y, "", **title_props)
 
         if sweep:
