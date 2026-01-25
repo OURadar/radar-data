@@ -505,7 +505,7 @@ def read_tarinfo(source, verbose=0):
     return tarinfo
 
 
-def read(source, **kwargs):
+def read(source: str, **kwargs):
     """
     read(source, **kwargs):
 
