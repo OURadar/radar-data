@@ -13,7 +13,6 @@ import argparse
 import datetime
 import textwrap
 import threading
-import setproctitle
 
 srcDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
 if os.path.exists(srcDir):
@@ -111,9 +110,6 @@ def main():
     parser.add_argument("--version", action="version", version="%(prog)s " + radar.__version__)
     args = parser.parse_args()
 
-    # Set the process title for easy identification
-    setproctitle.setproctitle(f"{__prog__} {' '.join(sys.argv[1:])}")
-
     # Read the configuration file
     config_file = args.source[0] if len(args.source) else "settings.yaml"
     if os.path.exists(config_file):
@@ -136,6 +132,8 @@ def main():
         logging.Formatter.converter = time.gmtime
 
     logger.info(f"Datashop {radar.__version__}")
+    os.environ["PROGRAM"] = __prog__
+    os.environ["VERSION"] = radar.__version__
 
     # Override other configuration by command line
     if args.host:
