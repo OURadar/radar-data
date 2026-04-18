@@ -35,6 +35,8 @@ def clamp(x, lo, hi):
 
 
 class Manager:
+    _originalSigIntHandler = None
+    _originalSigTermHandler = None
     def __init__(self, **kwargs):
         self.name = colorize("Manager", "green")
         self._port = kwargs.get("port", PORT)

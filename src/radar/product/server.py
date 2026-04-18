@@ -6,6 +6,7 @@ import radar
 import pickle
 import signal
 import socket
+import logging
 import threading
 import setproctitle
 import multiprocess as mp
@@ -19,7 +20,7 @@ from ..lrucache import LRUCache
 __prog__ = os.environ.get("PROGRAM", "datashop")
 __version__ = os.environ.get("VERSION", radar.__version__)
 
-logger = None
+logger = logging.getLogger(__name__)
 
 
 # Each reader is a separate process because data reader is not thread safe (limitation of HDF5)
