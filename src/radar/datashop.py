@@ -60,7 +60,9 @@ def test(**kwargs):
     tic = time.time()
 
     files = client.execute("list", folder=folder)
-
+    if not files:
+        logger.error(f"No files found in {folder}")
+        return 1
     for file in files:
         req = threading.Thread(target=request, args=(client, file, verbose))
         req.start()

@@ -2,6 +2,9 @@ import os
 import blib
 import json
 import matplotlib
+import matplotlib.colors
+import matplotlib.lines
+import matplotlib.text
 import matplotlib.patheffects
 import numpy as np
 
@@ -115,7 +118,7 @@ def coordsFromPoly(poly):
     return coords
 
 
-def get(poly, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), density=6.0):
+def get(poly, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), density=6.0) -> list:
     if isinstance(poly, str):
         if poly[:5] == "@ring":
             r = np.array([float(s) for s in poly.split("/")[1:]])
@@ -220,10 +223,10 @@ class Grid:
 
 
 class Overlay(Grid):
-    labels = None
-    county = None
-    highway = None
-    rings = None
+    rings = list()
+    labels = list()
+    county = list()
+    highway = list()
 
     def __init__(self, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), **kwargs):
         super().__init__(**kwargs)
