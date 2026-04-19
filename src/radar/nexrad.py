@@ -101,6 +101,10 @@ class Message:
     A NEXRAD message
     """
 
+    info = None
+    head = None
+    data = []
+
     # Page 3-7, Table II Message Header Data
     class Header:
         """
@@ -386,7 +390,7 @@ class Message:
                     self.name = self.name.decode("ascii")
                     self.v_a *= 0.01  # Convert to m/s
 
-    def __init__(self, blob: bytearray = None, offset: int = 0, skip_type1: bool = False):
+    def __init__(self, blob: bytearray, offset: int = 0, skip_type1: bool = False):
         """
         Initializes a NEXRAD message from a byte buffer.
 
@@ -396,9 +400,9 @@ class Message:
         """
         self.offset = offset
         self.next_offset = offset + METADATA_RECORD_SIZE
-        self.info = None
-        self.head = None
-        self.data = {}
+        # self.info = None
+        # self.head = None
+        # self.data = {}
         if blob is not None:
             self.info = self.Header(blob, self.offset)
             if self.info.type == 31:
@@ -514,7 +518,7 @@ def _records_from_file(file: str, skip_metadata: bool = True):
             offset = message.next_offset
         if message.info.type == 31:
             msg31.append(message)
-        elif vcp is None and message.info.type == 5:
+        elif message.info.type == 5 and not vcp:
             vcp = message
         else:
             meta.append(message)
@@ -578,7 +582,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     return vcp, msg31, timestring
 
 
-def get_vcp_msg31_timestamp(filename: str, **kwargs):
+def get_vcp_msg31_timestamp(filename: str, **kwargs) -> tuple(Message, list, float):
     """
     Extracts VCP and message 31 records from a NEXRAD Level II file.
     :param filename: Path to the NEXRAD Level II file.

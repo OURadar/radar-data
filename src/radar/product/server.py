@@ -60,7 +60,7 @@ class Conceirge:
                     send(sock, json.dumps({"pong": request["ping"]}).encode())
                 elif "path" in request:
                     name = os.path.basename(request["path"])
-                    logger.info(f"{myname} Sweep: {name}")
+                    logger.debug(f"{myname} Sweep: {name}")
                     blob = cache.get(name)
                     if blob is None:
                         # Queue it up for reader. Collector will put it in outQueue when ready
