@@ -2,12 +2,13 @@ import json
 import atexit
 import pickle
 import socket
+import logging
 import threading
 
 from .share import *
 from ..cosmetics import colorize, pretty_object_name
 
-logger = None
+logger = logging.getLogger(__name__)
 
 
 class Client(Manager):

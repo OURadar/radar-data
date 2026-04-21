@@ -5,6 +5,7 @@ import tarfile
 import datetime
 import numpy as np
 
+from typing import Optional, Tuple
 from netCDF4 import Dataset
 
 from .common import *
@@ -331,19 +332,24 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
     with tarfile.open(source) as aid:
         if "*" in tarinfo:
             info = _quartet_to_tarinfo(tarinfo["*"])
-            with aid.extractfile(info) as fid:
-                content = fid.read()
+            fid = aid.extractfile(info)
+            if fid is None:
+                logger.error(f"{myname} Unable to extract {info.name} in {show}")
+                return (None, tarinfo) if want_tarinfo else None
+            content = fid.read()
+            fid.close()
             with Dataset("memory", memory=content) as ncid:
                 sweep = _read_ncid(ncid, symbols=symbols, verbose=verbose)
         else:
             available_symbols = [s for s in symbols if s in tarinfo]
             for symbol in available_symbols:
                 info = _quartet_to_tarinfo(tarinfo[symbol])
-                with aid.extractfile(info) as fid:
-                    if verbose > 1:
-                        show = colorize(info.name, "yellow")
-                        logger.debug(f"{myname} {show}")
-                    content = fid.read()
+                fid = aid.extractfile(info)
+                if fid is None:
+                    logger.error(f"{myname} Unable to extract {info.name} in {show}")
+                    return (None, tarinfo) if want_tarinfo else None
+                content = fid.read()
+                fid.close()
                 with Dataset("memory", mode="r", memory=content) as ncid:
                     single = _read_ncid(ncid, symbols=symbols, verbose=verbose)
                 if sweep is None:
@@ -355,7 +361,11 @@ def _read_tar(source, symbols=["Z", "V", "W", "D", "P", "R"], tarinfo=None, want
         return (None, tarinfo) if want_tarinfo else None
     if sweep["sweepElevation"] == 0.0 and sweep["sweepAzimuth"] == 0.0:
         basename = os.path.basename(source)
-        parts = re_3parts.search(basename).groupdict()
+        parts = re_3parts.search(basename)
+        if parts is None:
+            logger.warning(f"{myname} Unable to parse scan angle from {basename}")
+            return (sweep, tarinfo) if want_tarinfo else sweep
+        parts = parts.groupdict()
         if parts["scan"][0] == "E":
             sweep["sweepElevation"] = float(parts["scan"][1:])
         elif parts["scan"][0] == "A":
@@ -416,6 +426,9 @@ def _read_nexrad(source, sweep_index=0, symbols=["Z", "V", "W", "D", "P", "R"], 
         logger.debug(f"{myname} {colorize(source, 'yellow')}")
 
     vcp, msg31, timestamp = get_vcp_msg31_timestamp(source, sweep_index=sweep_index, verbose=verbose)
+    if vcp is None or len(vcp.data) <= sweep_index:
+        logger.error(f"{myname} Unable to read VCP from {source}")
+        return None
 
     nrays = len(msg31)
     data = msg31[0].data
@@ -494,7 +507,11 @@ def read_tarinfo(source, verbose=0):
                 tarinfo["*"] = [m.name, m.size, m.offset, m.offset_data]
             else:
                 for m in members:
-                    parts = re_4parts.search(os.path.basename(m.name)).groupdict()
+                    parts = re_4parts.search(os.path.basename(m.name))
+                    if not parts:
+                        logger.warning(f"{myname} Unable to parse symbol from {m.name}")
+                        continue
+                    parts = parts.groupdict()
                     tarinfo[parts["symbol"]] = [m.name, m.size, m.offset, m.offset_data]
     except tarfile.ReadError:
         logger.error(f"Error: The archive {source} is not a valid tar file")
@@ -505,7 +522,7 @@ def read_tarinfo(source, verbose=0):
     return tarinfo
 
 
-def read(source: str, **kwargs):
+def read(source: str, **kwargs) -> Optional[dict] | Tuple[Optional[dict], Optional[dict]]:
     """
     read(source, **kwargs):
 
@@ -544,7 +561,7 @@ def read(source: str, **kwargs):
             tarinfo=tarinfo,
             want_tarinfo=want_tarinfo,
         )
-        if want_tarinfo:
+        if want_tarinfo and isinstance(output, tuple):
             data, tarinfo = output
         else:
             data = output
@@ -559,6 +576,8 @@ def read(source: str, **kwargs):
         raise ValueError(f"{myname} Unsupported file format (ext = {ext})")
     if data is None:
         raise ValueError(f"{myname} No data found in {source}")
+    if not isinstance(data, dict) or "products" not in data:
+        raise ValueError(f"{myname} Invalid data format in {source}")
     if kwargs.get("u8", False):
         data["u8"] = {}
         for key, value in data["products"].items():

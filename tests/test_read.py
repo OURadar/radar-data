@@ -32,7 +32,7 @@ def download_data_if_not_exists():
             break
     if any_missing:
         print(f"Downloading test data ...")
-        url = f"https://radarhub.arrc.ou.edu/static/radar-data-test.txz"
+        url = f"https://arrc.ou.edu/static/radar-data-test.txz"
         urllib.request.urlretrieve(url, "_radar-data-test.txz")
         print(f"Extracting test data ...")
         os.makedirs(TEST_FILE_FOLDER, exist_ok=True)

@@ -6,19 +6,21 @@ import radar
 import pickle
 import signal
 import socket
+import logging
 import threading
+import setproctitle
 import multiprocess as mp
 
 # import multiprocessing as mp
-
-from setproctitle import setproctitle, getproctitle
 
 from .share import *
 from ..cosmetics import colorize, pretty_object_name
 from ..lrucache import LRUCache
 
+__prog__ = os.environ.get("PROGRAM", "datashop")
+__version__ = os.environ.get("VERSION", radar.__version__)
 
-logger = None
+logger = logging.getLogger(__name__)
 
 
 # Each reader is a separate process because data reader is not thread safe (limitation of HDF5)
@@ -58,7 +60,7 @@ class Conceirge:
                     send(sock, json.dumps({"pong": request["ping"]}).encode())
                 elif "path" in request:
                     name = os.path.basename(request["path"])
-                    logger.info(f"{myname} Sweep: {name}")
+                    logger.debug(f"{myname} Sweep: {name}")
                     blob = cache.get(name)
                     if blob is None:
                         # Queue it up for reader. Collector will put it in outQueue when ready
@@ -122,7 +124,7 @@ class Conceirge:
 
 def _reader(id, workQueue, dataQueue, lock, wantActive):
     myname = pretty_object_name("Server.reader", f"{id:02d}")
-    setproctitle(f"{getproctitle()} # reader[{id}]")
+    setproctitle.setproctitle(f"{__prog__}: {__version__}: reader {id}")
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     with lock:
@@ -178,7 +180,7 @@ class Server(Manager):
         sd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sd.bind((self._host, self._port))
         sd.settimeout(0.05)
-        sd.listen(32)
+        sd.listen(64)
         logger.info(f"{myname} Started")
         while self.wantActive:
             try:
