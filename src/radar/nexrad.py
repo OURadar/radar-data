@@ -460,6 +460,7 @@ class Message:
         Decodes as type 31 (Digital Radar Generic Format Blocks)
         """
         self.head = self.Type31.Header(blob, offset)
+        self.data = {}
         for pointer in self.head.block_pointers:
             block = self.Type31.Data.Unknown(blob, offset + pointer)
             if block.name == "VOL":
