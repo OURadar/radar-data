@@ -105,7 +105,7 @@ class Message:
 
     info = None
     head = None
-    data = []
+    data: dict | list = {}
 
     # Page 3-7, Table II Message Header Data
     class Header:
@@ -137,6 +137,7 @@ class Message:
 
             _size_ = 100
             _format_ = ">IHhHHHHHHHHHHHHfHHHHH8s2s2s2shhhH32s"
+            data: Optional[np.ndarray] = None
 
             def __init__(self, blob: bytearray, offset: int):
                 (
@@ -176,7 +177,7 @@ class Message:
             dr = 0.0
             scale = 1.0
             offset = 0.0
-            values = None
+            values: Optional[np.ndarray] = None
 
             def __init__(self, ngates: int = 0, r0: float = 0.0, dr: float = 0.0):
                 self.ngates = ngates
@@ -300,7 +301,7 @@ class Message:
 
                 _size_ = 28
                 _format_ = ">1s3sIHhhhhBBff"
-                values = None
+                values: Optional[np.ndarray] = None
 
                 def __init__(self, blob: bytearray, offset: int):
                     (
@@ -417,7 +418,7 @@ class Message:
         Decodes as type 1 (Old data format, need more testing)
         """
         self.head = self.Type1.Header(blob, offset)
-
+        self.data = {}
         if self.head.z_pointer:
             origin = offset + self.head.z_pointer
             values = np.frombuffer(blob[origin : origin + self.head.z_ngates], ">u1")
@@ -484,7 +485,7 @@ class Message:
         """
         Returns the PRF (Pulse Repetition Frequency) of the message. (need more work)
         """
-        if self.info.type == 31:
+        if self.info and self.info.type == 31 and isinstance(self.data, dict) and "RAD" in self.data:
             return self.data["RAD"].v_a / NEXRAD_WAVELENGTH * 4.0
         return 0.0
 
