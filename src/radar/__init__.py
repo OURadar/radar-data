@@ -8,4 +8,4 @@ from .write import write
 from . import cosmetics
 from . import product
 
-print = cosmetics.print
+print = cosmetics.cprint
