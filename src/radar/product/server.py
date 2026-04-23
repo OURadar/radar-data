@@ -9,9 +9,7 @@ import socket
 import logging
 import threading
 import setproctitle
-import multiprocess as mp
-
-# import multiprocessing as mp
+import multiprocessing as mp
 
 from .share import *
 from ..cosmetics import colorize, pretty_object_name
@@ -139,7 +137,11 @@ def _reader(id, workQueue, dataQueue, lock, wantActive):
             tarinfo = request.get("tarinfo", None)
             fileno = request["fileno"]
             path = request["path"]
-            data, tarinfo = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
+            out = radar.read(path, tarinfo=tarinfo, want_tarinfo=True)
+            if out is None:
+                logger.error(f"{myname} Failed to read {path}")
+                continue
+            data, tarinfo = out
             blob = pickle.dumps({"data": data, "tarinfo": tarinfo})
             dataQueue.put({"fileno": fileno, "path": path, "blob": blob})
             request.task_done()
@@ -149,6 +151,17 @@ def _reader(id, workQueue, dataQueue, lock, wantActive):
 
 
 class Server(Manager):
+    # Multiprocessing.
+    # IMPORTANT: Do not share cache across processes
+    # jobQueue - request queue for readers to pick up
+    # midQueue - middle data queue for readers to put data and collector to pick up
+    # outQueue - Output queue for concierges to get data to deliver, keyed by client fileno
+    mpLock = mp.Lock()
+    mpWantActive = mp.Value("i", 0)
+    jobQueue = mp.Queue()
+    midQueue = mp.Queue()
+    outQueue = {}
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._host = kwargs.get("host", "0.0.0.0")
@@ -158,13 +171,6 @@ class Server(Manager):
         logger = self.logger
         self.cache = LRUCache(kwargs.get("cache", 1000))
         self.clients = {}
-        # Multiprocessing.
-        # IMPORTANT: Do not share cache across processes
-        self.mpLock = mp.Lock()
-        self.mpWantActive = mp.Value("i", 0)
-        self.jobQueue = mp.Queue()  # Request queue for readers to pick up
-        self.midQueue = mp.Queue()  # Middle data queue for readers to put data
-        self.outQueue = {}  # Output queue for concierges to get data to deliver, fileno as key
         self.workers = []
         for k in range(self.count):
             w = mp.Process(target=_reader, args=(k, self.jobQueue, self.midQueue, self.mpLock, self.mpWantActive))

@@ -1,3 +1,5 @@
+# pyright: ignore
+
 """
 This is not used. It is a reference to the original implementation of the Server & Client classes.
 """
@@ -5,13 +7,14 @@ This is not used. It is a reference to the original implementation of the Server
 import os
 import json
 import time
+import uuid
 import radar
 import redis
 import pickle
 import signal
 import logging
 import threading
-import multiprocess as mp
+import multiprocessing as mp
 
 from setproctitle import setproctitle, getproctitle
 
@@ -22,7 +25,7 @@ from .const import CHANNEL
 from .share import clamp
 
 cache = None
-logger = None
+logger = logging.getLogger("radar-data")
 
 # Not recommended. Keep here for reference
 
@@ -90,7 +93,7 @@ class ServerRedis:
                 if "path" in info:
                     name = os.path.basename(info["path"])
                     logger.info(f"{myname} Sweep: {name} {channel}")
-                    data = cache.get(name)
+                    data = cache.get(name) if cache else None
                     if data is None:
                         # Queue it up for reader, _responseHandler() will respond
                         self.taskQueue.put(info)
@@ -99,7 +102,7 @@ class ServerRedis:
                         self.relay.publish(channel, data)
                         logger.info(f"{myname} {tag}: {name} ({len(data):,d} B)")
                 elif "stats" in info:
-                    self.relay.publish(channel, cache.size())
+                    self.relay.publish(channel, cache.size() if cache else "No cache")
         logger.info(f"{myname} Stopped")
 
     def _responseHandler(self, id):
@@ -114,7 +117,8 @@ class ServerRedis:
                 channel = result["channel"]
                 data = result["data"]
                 name = os.path.basename(result["path"])
-                cache.put(name, data)
+                if cache:
+                    cache.put(name, data)
                 logger.info(f"{myname} {tag}: {name} ({len(data):,d} B)")
                 self.relay.publish(channel, data)
                 result.task_done()
@@ -143,9 +147,9 @@ class ServerRedis:
 
     def stop(self):
         logger.info(f"{self.name} Stopping ...")
-        for buf in self.buffers:
-            buf.close()
-            buf.unlink()
+        # for buf in self.buffers:
+        #     buf.close()
+        #     buf.unlink()
         self.run.value = 0
         self.pubsub.close()
 
