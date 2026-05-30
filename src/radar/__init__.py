@@ -1,4 +1,4 @@
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 
 from .common import *
 from .fifobuffer import FIFOBuffer
@@ -8,4 +8,4 @@ from .write import write
 from . import cosmetics
 from . import product
 
-print = cosmetics.print
+print = cosmetics.cprint

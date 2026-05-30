@@ -2,7 +2,7 @@
 #   Created by Boonleng Cheong
 #
 
-import pprint
+import pprint as pp
 import numpy as np
 
 # Constants, more constants at the end of the file
@@ -54,9 +54,9 @@ def pretty_object_name(classname, name, origin=None):
 
 def hex2rgba(strs):
     for str in strs:
-        r = int(str[:2], 16) / 255
-        g = int(str[2:4], 16) / 255
-        b = int(str[4:6], 16) / 255
+        r = int(str[:2], 16) / 255.0
+        g = int(str[2:4], 16) / 255.0
+        b = int(str[4:6], 16) / 255.0
         print(f"[{r:.3f}, {g:.3f}, {b:.3f}, 1.0]")
 
 
@@ -105,7 +105,9 @@ def test_byte_string():
     print(byte_string(x))
 
 
-class NumpyPrettyPrinter(pprint.PrettyPrinter):
+class NumpyPrettyPrinter(pp.PrettyPrinter):
+    _indent_per_level = 2
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._current_indent = 0
@@ -186,7 +188,7 @@ class NumpyPrettyPrinter(pprint.PrettyPrinter):
                 write(delimnl)
 
 
-def print(data: dict):
+def cprint(data: dict):
     """
     Pretty print the data dictionary.
     """

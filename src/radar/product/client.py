@@ -161,7 +161,7 @@ class Client(Manager):
             payload = json.dumps({"execute": command, **kwargs}).encode()
             send(sock, payload)
             message = recv(sock)
-            if command == "list":
+            if message and command == "list":
                 message = json.loads(message)
         return message
 
