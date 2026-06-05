@@ -1,5 +1,4 @@
 import blib
-import blib.colormap
 import hashlib
 import datetime
 import numpy as np
