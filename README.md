@@ -53,7 +53,6 @@ radar.write("output-file.nc", sweep)
 To draw a chart:
 ```python
 import radar
-import radar.chart
 
 # Read a sweep as before
 sweep = radar.read(file)
@@ -110,6 +109,8 @@ options:
 ```
 
 ## Unit Tests
+
+Create or make a make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test may download the test data from our server.
 
 To run a set of reading tests through `pytest`:
 
