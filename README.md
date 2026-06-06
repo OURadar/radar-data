@@ -1,7 +1,8 @@
 # Radar Data
 
-[![Version][version-shield]][release-link]
-[![License][license-shield]][license-link]
+[![][version-shield]][release-link]
+[![][python-shield]][python-link]
+[![][license-shield]][license-link]
 
 This is a collection of radar data readers, a CF-Radial radar data writer, and charting routines.
 
@@ -138,5 +139,7 @@ pytest -s
 <!-- Link Definitions -->
 [version-shield]: https://img.shields.io/github/v/release/ouradar/radar-data
 [release-link]: https://github.com/ouradar/radar-data/releases
+[python-shield]: https://img.shields.io/badge/python-3.10+-ffd43b?logo=python&logoColor=fff
+[python-link]: https://www.python.org
 [license-shield]: https://img.shields.io/badge/license-MIT-red
 [license-link]: https://github.com/ouradar/radar-data/blob/master/LICENSE
