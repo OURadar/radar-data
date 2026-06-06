@@ -14,7 +14,7 @@ class LRUCache:
         self.capacity = capacity
         self.cache = OrderedDict()
 
-    def get(self, key: str) -> bytes:
+    def get(self, key: str) -> bytes | None:
         if key not in self.cache:
             return None
         else:
