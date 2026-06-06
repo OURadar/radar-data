@@ -1,6 +1,5 @@
 [![][version-shield]][release-link]
 [![][license-shield]][license-link]
-[![pipeline status](https://git.arrc.ou.edu/radar/radarkit/badges/master/pipeline.svg)](https://git.arrc.ou.edu/radar/radarkit/-/commits/master)
 
 # Radar Data
 
