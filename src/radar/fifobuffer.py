@@ -1,6 +1,4 @@
 from collections import deque
-
-
 class FIFOBuffer:
     def __init__(self):
         self.queue = deque()

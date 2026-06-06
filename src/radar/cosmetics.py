@@ -28,7 +28,7 @@ colors = {
 highlights = {"info": "\033[48;5;6;38;5;15m", "warning": "\033[48;5;172;38;5;15m", "error": "\033[1;48;5;3;38;5;15m"}
 
 
-def colorize(text, color="white", end="\033[0m"):
+def colorize(text:str, color:str|int="white", end="\033[0m"):
     if isinstance(color, int):
         return f"\033[38;5;{color}m{text}{end}"
     elif color in colors:
@@ -41,7 +41,7 @@ def colorize(text, color="white", end="\033[0m"):
         return text
 
 
-def pretty_object_name(classname, name, origin=None):
+def pretty_object_name(classname:str, name:str, origin=None):
     g = f"\033[38;5;{colors['green']}m"
     y = f"\033[38;5;{colors['gold']}m"
     p = f"\033[38;5;{colors['purple']}m"
@@ -52,7 +52,7 @@ def pretty_object_name(classname, name, origin=None):
     return f"{g}{classname}{y}[{p}{name}{w}:{b}{origin}{y}]\033[m"
 
 
-def hex2rgba(strs):
+def hex2rgba(strs:str):
     for str in strs:
         r = int(str[:2], 16) / 255.0
         g = int(str[2:4], 16) / 255.0
@@ -188,7 +188,7 @@ class NumpyPrettyPrinter(pp.PrettyPrinter):
                 write(delimnl)
 
 
-def cprint(data: dict):
+def dict_print(data: dict):
     """
     Pretty print the data dictionary.
     """
