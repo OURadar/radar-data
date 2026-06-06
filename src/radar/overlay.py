@@ -2,6 +2,9 @@ import os
 import blib
 import json
 import matplotlib
+import matplotlib.colors
+import matplotlib.lines
+import matplotlib.text
 import matplotlib.patheffects
 import numpy as np
 
@@ -115,7 +118,7 @@ def coordsFromPoly(poly):
     return coords
 
 
-def get(poly, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), density=6.0):
+def get(poly, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), density=6.0) -> list:
     if isinstance(poly, str):
         if poly[:5] == "@ring":
             r = np.array([float(s) for s in poly.split("/")[1:]])
@@ -220,15 +223,16 @@ class Grid:
 
 
 class Overlay(Grid):
-    labels = None
-    county = None
-    highway = None
-    rings = None
+    rings = list()
+    labels = list()
+    county = list()
+    highway = list()
 
     def __init__(self, origin=(-97.46381, 35.23682), extent=(-160, -90, 160, 90), **kwargs):
         super().__init__(**kwargs)
         self.origin = origin
         self.extent = extent
+        self.verbose = kwargs.get("verbose", 0)
         self.density = kwargs.get("density", 4.0)
         self.radii = kwargs.get("radii", radii(max_range=np.hypot(extent[2], extent[3]), about=7))
 
@@ -236,11 +240,22 @@ class Overlay(Grid):
         return self.size3 if pop > pop_big else self.size2 if pop > pop_med else self.size1
 
     def load(self):
+        if self.verbose:
+            print("Loading overlay maps...")
         self.labels = get("city", self.origin, self.extent, self.density)
+        if self.verbose:
+            print("Loaded {} city labels".format(len(self.labels)))
         self.county = get("county", self.origin, self.extent)
+        if self.verbose:
+            print("Loaded county boundaries")
         self.highway = get("highway", self.origin, self.extent)
+        if self.verbose:
+            print("Loaded highway boundaries")
         name = "@ring/" + "/".join([f"{r:.0f}" for r in self.radii])
         self.rings = get(name, self.origin, self.extent)
+        if self.verbose:
+            print("Loaded range rings")
+            print("Overlay maps loaded.")
         # Append ring labels to self.labels
         c, s = np.cos(np.pi / 4), np.sin(np.pi / 4)
         for r in self.radii[1:]:

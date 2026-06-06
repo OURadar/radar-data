@@ -35,6 +35,9 @@ def clamp(x, lo, hi):
 
 
 class Manager:
+    _originalSigIntHandler = None
+    _originalSigTermHandler = None
+
     def __init__(self, **kwargs):
         self.name = colorize("Manager", "green")
         self._port = kwargs.get("port", PORT)
@@ -62,11 +65,11 @@ class Manager:
         self.logger.info(f"{myname} {signalName.get(signum, 'UNKNOWN')} received")
         self.stop(callback=self._afterStop, args=(signum, frame))
 
-    def _afterStop(self, signum, frame):
+    def _afterStop(self, signum, _):
         if signum == signal.SIGINT and self._originalSigIntHandler:
-            self._originalSigIntHandler(signum, frame)
-        elif signum == signal.SIGTERM and self._originalSigTermHandler:
-            self._originalSigTermHandler(signum, frame)
+            signal.signal(signal.SIGINT, self._originalSigIntHandler)
+        if signum == signal.SIGTERM and self._originalSigTermHandler:
+            signal.signal(signal.SIGTERM, self._originalSigTermHandler)
 
     def _shallow_sleep(self, seconds):
         self.wakeUp = False

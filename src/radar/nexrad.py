@@ -39,6 +39,8 @@ import datetime
 import urllib.request
 import numpy as np
 
+from typing import List, Tuple, Optional
+
 from .cosmetics import colorize
 
 # The first 12 bytes are empty, which means the "Message Size" does not begin until byte 13
@@ -101,6 +103,10 @@ class Message:
     A NEXRAD message
     """
 
+    info = None
+    head = None
+    data: dict | list = {}
+
     # Page 3-7, Table II Message Header Data
     class Header:
         """
@@ -131,6 +137,7 @@ class Message:
 
             _size_ = 100
             _format_ = ">IHhHHHHHHHHHHHHfHHHHH8s2s2s2shhhH32s"
+            data: Optional[np.ndarray] = None
 
             def __init__(self, blob: bytearray, offset: int):
                 (
@@ -170,7 +177,7 @@ class Message:
             dr = 0.0
             scale = 1.0
             offset = 0.0
-            values = None
+            values: Optional[np.ndarray] = None
 
             def __init__(self, ngates: int = 0, r0: float = 0.0, dr: float = 0.0):
                 self.ngates = ngates
@@ -294,7 +301,7 @@ class Message:
 
                 _size_ = 28
                 _format_ = ">1s3sIHhhhhBBff"
-                values = None
+                values: Optional[np.ndarray] = None
 
                 def __init__(self, blob: bytearray, offset: int):
                     (
@@ -386,7 +393,7 @@ class Message:
                     self.name = self.name.decode("ascii")
                     self.v_a *= 0.01  # Convert to m/s
 
-    def __init__(self, blob: bytearray = None, offset: int = 0, skip_type1: bool = False):
+    def __init__(self, blob: bytearray, offset: int = 0, skip_type1: bool = False):
         """
         Initializes a NEXRAD message from a byte buffer.
 
@@ -396,9 +403,6 @@ class Message:
         """
         self.offset = offset
         self.next_offset = offset + METADATA_RECORD_SIZE
-        self.info = None
-        self.head = None
-        self.data = {}
         if blob is not None:
             self.info = self.Header(blob, self.offset)
             if self.info.type == 31:
@@ -414,7 +418,7 @@ class Message:
         Decodes as type 1 (Old data format, need more testing)
         """
         self.head = self.Type1.Header(blob, offset)
-
+        self.data = {}
         if self.head.z_pointer:
             origin = offset + self.head.z_pointer
             values = np.frombuffer(blob[origin : origin + self.head.z_ngates], ">u1")
@@ -456,6 +460,7 @@ class Message:
         Decodes as type 31 (Digital Radar Generic Format Blocks)
         """
         self.head = self.Type31.Header(blob, offset)
+        self.data = {}
         for pointer in self.head.block_pointers:
             block = self.Type31.Data.Unknown(blob, offset + pointer)
             if block.name == "VOL":
@@ -481,7 +486,7 @@ class Message:
         """
         Returns the PRF (Pulse Repetition Frequency) of the message. (need more work)
         """
-        if self.info.type == 31:
+        if self.info and self.info.type == 31 and isinstance(self.data, dict) and "RAD" in self.data:
             return self.data["RAD"].v_a / NEXRAD_WAVELENGTH * 4.0
         return 0.0
 
@@ -514,7 +519,7 @@ def _records_from_file(file: str, skip_metadata: bool = True):
             offset = message.next_offset
         if message.info.type == 31:
             msg31.append(message)
-        elif vcp is None and message.info.type == 5:
+        elif message.info.type == 5 and not vcp:
             vcp = message
         else:
             meta.append(message)
@@ -534,7 +539,11 @@ def _nrays_from_vcp(vcp: Message):
 
 def _get_vcp_msg31_timestring_volume(filename: str, **kwargs):
     sweep_index = kwargs.get("sweep_index", 0)
-    vcp, msg31 = _records_from_file(filename)
+    out = _records_from_file(filename)
+    if isinstance(out, tuple) and len(out) == 2:
+        vcp, msg31 = out
+    else:
+        raise ValueError(f"Unexpected output from _records_from_file: {out}")
     if vcp is None or len(msg31) == 0:
         raise ValueError(f"Invalid file format: {filename} (vcp = {vcp}), {len(msg31)} msg31)")
     nrays = _nrays_from_vcp(vcp)
@@ -559,7 +568,13 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
         raise ValueError(f"No files found for {filename}")
     files = sorted(files, key=lambda x: int(x.split("-")[-2]))
     # Get VCP info from the first file
-    vcp, _ = _records_from_file(files[0])
+    out = _records_from_file(files[0])
+    if isinstance(out, tuple) and len(out) == 2:
+        vcp, _ = out
+    else:
+        raise ValueError(f"Unexpected output from _records_from_file: {out}")
+    if vcp is None:
+        raise ValueError(f"Invalid file format: {files[0]} (vcp = {vcp})")
     nrays = _nrays_from_vcp(vcp)
     nfiles = [x // RADIALS_PER_RECORD for x in nrays]
     counts = [sum(nfiles[:i]) for i in range(len(nfiles) + 1)]
@@ -570,7 +585,14 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     msg31 = []
     for file in files[start_end[sweep_index]]:
         logger.debug(f"{myname} {file}")
-        _, m = _records_from_file(file)
+        out = _records_from_file(file)
+        if isinstance(out, tuple) and len(out) == 2:
+            _, m = out
+        else:
+            raise ValueError(f"Unexpected output from _records_from_file: {out}")
+        if not isinstance(m, list):
+            logger.warning(f"No message 31 records found in {file}")
+            continue
         msg31.extend(m)
     timestring = re_parts_stripped.match(os.path.basename(filename))
     if timestring:
@@ -578,7 +600,7 @@ def _get_vcp_msg31_timestring_stripped(filename: str, **kwargs):
     return vcp, msg31, timestring
 
 
-def get_vcp_msg31_timestamp(filename: str, **kwargs):
+def get_vcp_msg31_timestamp(filename: str, **kwargs) -> Tuple[Message, List, float]:
     """
     Extracts VCP and message 31 records from a NEXRAD Level II file.
     :param filename: Path to the NEXRAD Level II file.

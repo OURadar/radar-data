@@ -2,6 +2,7 @@ import sys
 import zlib
 import threading
 
+from typing import Optional
 from collections import OrderedDict
 
 lock = threading.Lock()
@@ -14,7 +15,7 @@ class LRUCache:
         self.capacity = capacity
         self.cache = OrderedDict()
 
-    def get(self, key: str) -> bytes | None:
+    def get(self, key: str) -> Optional[bytes]:
         if key not in self.cache:
             return None
         else:

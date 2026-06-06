@@ -2,12 +2,13 @@ import json
 import atexit
 import pickle
 import socket
+import logging
 import threading
 
 from .share import *
 from ..cosmetics import colorize, pretty_object_name
 
-logger = None
+logger = logging.getLogger(__name__)
 
 
 class Client(Manager):
@@ -160,7 +161,7 @@ class Client(Manager):
             payload = json.dumps({"execute": command, **kwargs}).encode()
             send(sock, payload)
             message = recv(sock)
-            if command == "list":
+            if message and command == "list":
                 message = json.loads(message)
         return message
 
