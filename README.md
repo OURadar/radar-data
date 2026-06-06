@@ -1,7 +1,7 @@
-[![][version-shield]][release-link]
-[![][license-shield]][license-link]
-
 # Radar Data
+
+[![Version][version-shield]][release-link]
+[![License][license-shield]][license-link]
 
 This is a collection of radar data readers, a CF-Radial radar data writer, and charting routines.
 
@@ -54,6 +54,7 @@ radar.write("output-file.nc", sweep)
 ```
 
 To draw a chart:
+
 ```python
 import radar
 
