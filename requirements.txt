@@ -1,6 +1,8 @@
 blib-py>=1.8
+lxml
 multiprocess
 netCDF4
 numpy
+pandas
 pyyaml
 setproctitle

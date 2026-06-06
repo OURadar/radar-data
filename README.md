@@ -113,11 +113,13 @@ options:
 
 ## Unit Tests
 
-Create or make a make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test may download the test data from our server.
+Make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test may download the test data from our server.
 
 To run a set of reading tests through `pytest`:
 
 ```shell
+mkdir ~/Downloads/test-data
+ln -s ~/Downloads/test-data data
 pytest -s
 ```
 
