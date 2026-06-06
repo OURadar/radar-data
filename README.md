@@ -1,3 +1,7 @@
+[![][version-shield]][release-link]
+[![][license-shield]][license-link]
+[![pipeline status](https://git.arrc.ou.edu/radar/radarkit/badges/master/pipeline.svg)](https://git.arrc.ou.edu/radar/radarkit/-/commits/master)
+
 # Radar Data
 
 This is a collection of radar data readers, a CF-Radial radar data writer, and charting routines.
@@ -117,3 +121,9 @@ To run a set of reading tests through `pytest`:
 ```shell
 pytest -s
 ```
+
+<!-- Link Definitions -->
+[version-shield]: https://img.shields.io/github/v/release/ouradar/radar-data
+[release-link]: https://github.com/ouradar/radar-data/releases
+[license-shield]: https://img.shields.io/badge/license-MIT-red
+[license-link]: https://github.com/ouradar/radar-data/blob/master/LICENSE
