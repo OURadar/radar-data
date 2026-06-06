@@ -112,9 +112,20 @@ options:
   --version             show program's version number and exit
 ```
 
+### Example Configuration
+
+```yaml
+host: 0.0.0.0
+port: 50000
+count: 8
+cache: 3000
+logfile: /var/log/radarhub/datashop.log
+utc: true
+```
+
 ## Unit Tests
 
-Make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test may download the test data from our server.
+Make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test will download the test data from our server.
 
 To run a set of reading tests through `pytest`:
 
