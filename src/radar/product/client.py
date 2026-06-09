@@ -106,7 +106,7 @@ class Client(Manager):
                 sock.close()
 
     @lru_cache(maxsize=32)
-    def cached_get(self, path, tarinfo={}, want_tarinfo=False):
+    def cached_get(self, path, tarinfo=(), want_tarinfo=False):
         tarinfo = dict(tarinfo)
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
@@ -141,7 +141,16 @@ class Client(Manager):
         return data
 
     def get(self, path, tarinfo: dict = {}, want_tarinfo=False):
-        return self.cached_get(path, tuple(sorted(tarinfo.items())), want_tarinfo)
+        def freeze(obj):
+            if isinstance(obj, dict):
+                return frozenset((k, freeze(v)) for k, v in obj.items())
+            if isinstance(obj, list):
+                return tuple(freeze(x) for x in obj)
+            if isinstance(obj, set):
+                return frozenset(freeze(x) for x in obj)
+            return obj
+
+        return self.cached_get(path, freeze(tarinfo), want_tarinfo)
 
     def stats(self):
         if self.sockets == []:
