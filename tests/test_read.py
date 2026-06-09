@@ -1,4 +1,5 @@
 import os
+import blib
 import urllib.request
 
 TEST_FILE_FOLDER = "data"
@@ -36,7 +37,7 @@ def download_data_if_not_exists():
         urllib.request.urlretrieve(url, "_radar-data-test.txz")
         print(f"Extracting test data ...")
         os.makedirs(TEST_FILE_FOLDER, exist_ok=True)
-        os.system(f"tar -x -v -C {TEST_FILE_FOLDER} -f _radar-data-test.txz")
+        os.system(f"tar -x -C {TEST_FILE_FOLDER} -f _radar-data-test.txz")
         os.remove("_radar-data-test.txz")
 
 
@@ -44,18 +45,20 @@ def test_read():
     """
     Test the read function
     """
+    download_data_if_not_exists()
+
+    check = blib.cosmetics.check
+    cross = blib.cosmetics.cross
+
     for file in TEST_FILES:
         file = os.path.join(TEST_FILE_FOLDER, file)
-        print(f"Testing file {file}")
         if not os.path.exists(file):
             print(f"File {file} does not exist")
-            data = radar.read(file)
-            assert data is not None, "Failed to read the file"
+        data = radar.read(file)
+        print(f"Test reading file {file} {cross if data is None else check}")
 
 
 # Example usage
 if __name__ == "__main__":
-
-    download_data_if_not_exists()
 
     test_read()

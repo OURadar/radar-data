@@ -1,6 +1,8 @@
-__version__ = "1.5.3"
+__version__ = "1.6"
 
 import importlib
+
+from typing import TYPE_CHECKING
 
 from .common import *
 
@@ -9,6 +11,13 @@ _sub_ = ["chart", "cosmetics", "product"]
 _misc_ = ["print", "FIFOBuffer"]
 _read_ = ["read", "read_tarinfo", "set_logger"]
 _write_ = ["write"]
+
+if TYPE_CHECKING:
+    from .read import read, read_tarinfo, set_logger
+    from .write import write
+    from .fifobuffer import FIFOBuffer
+    from .cosmetics import dict_print as print
+    from . import chart, cosmetics, product
 
 def __dir__():
     return sorted(list(globals().keys()) + _sub_ + _read_ + _write_ +_misc_)

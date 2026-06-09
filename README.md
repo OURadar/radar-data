@@ -1,5 +1,9 @@
 # Radar Data
 
+[![][version-shield]][release-link]
+[![][python-shield]][python-link]
+[![][license-shield]][license-link]
+
 This is a collection of radar data readers, a CF-Radial radar data writer, and charting routines.
 
 Supported input formats:
@@ -51,9 +55,9 @@ radar.write("output-file.nc", sweep)
 ```
 
 To draw a chart:
+
 ```python
 import radar
-import radar.chart
 
 # Read a sweep as before
 sweep = radar.read(file)
@@ -109,10 +113,33 @@ options:
   --version             show program's version number and exit
 ```
 
+### Example Configuration
+
+```yaml
+host: 0.0.0.0
+port: 50000
+count: 8
+cache: 3000
+logfile: /var/log/radarhub/datashop.log
+utc: true
+```
+
 ## Unit Tests
+
+Make a symbolic link to a subfolder `data` under this repository. If the folder `data` has no data, the test will download the test data from our server.
 
 To run a set of reading tests through `pytest`:
 
 ```shell
+mkdir ~/Downloads/test-data
+ln -s ~/Downloads/test-data data
 pytest -s
 ```
+
+<!-- Link Definitions -->
+[version-shield]: https://img.shields.io/github/v/release/ouradar/radar-data
+[release-link]: https://github.com/ouradar/radar-data/releases
+[python-shield]: https://img.shields.io/badge/python-3.10+-ffd43b?logo=python&logoColor=fff
+[python-link]: https://www.python.org
+[license-shield]: https://img.shields.io/badge/license-MIT-red
+[license-link]: https://github.com/ouradar/radar-data/blob/master/LICENSE

@@ -462,45 +462,45 @@ class _ChartLayout:
                 continue
             if "map" in kwargs:
                 value = kwargs["map"](sweep["products"][symbol])
-                cmap = kwargs.get("cmap", blib.matplotlibColormap("zmapx"))
+                cmap = kwargs.get("cmap", blib.colormap.matplotlibColormap("zmapx"))
                 vmin = kwargs.get("vmin", np.min(value.flatten()))
                 vmax = kwargs.get("vmax", np.max(value.flatten()))
             elif symbol[0] == "Z":
                 value = sweep["products"][symbol]
-                cmap = blib.matplotlibColormap("rsz")
+                cmap = blib.colormap.matplotlibColormap("rsz")
                 vmin, vmax = -32, 96
             elif symbol[0] == "V":
                 value = sweep["products"][symbol]
-                cmap = blib.matplotlibColormap("v")
+                cmap = blib.colormap.matplotlibColormap("v")
                 vmin, vmax = -64, 64
             elif symbol[0] == "W":
                 value = sweep["products"][symbol]
-                cmap = blib.matplotlibColormap("w")
+                cmap = blib.colormap.matplotlibColormap("w")
                 vmin, vmax = 0, 12.8
             elif symbol == "D":
                 value = sweep["products"][symbol]
-                cmap = blib.matplotlibColormap("rsd")
+                cmap = blib.colormap.matplotlibColormap("rsd")
                 vmin, vmax = -10, 15.5
             elif symbol == "P":
                 value = sweep["products"][symbol]
-                cmap = blib.matplotlibColormap("p")
+                cmap = blib.colormap.matplotlibColormap("p")
                 vmin, vmax = -180, 180
             elif symbol == "R":
                 value = rho2ind(sweep["products"][symbol])
-                cmap = blib.matplotlibColormap("rsr")
+                cmap = blib.colormap.matplotlibColormap("rsr")
                 vmin, vmax = 0, 256
             elif symbol == "RR":
                 value = np.log10(sweep["products"][symbol])
-                cmap = blib.matplotlibColormap("rr")
+                cmap = blib.colormap.matplotlibColormap("rr")
                 vmin, vmax = -1, 2
             elif "labels" in kwargs:
                 value = sweep["products"][symbol]
-                cmap = kwargs.get("cmap", blib.matplotlibColormap("zmapx"))
+                cmap = kwargs.get("cmap", blib.colormap.matplotlibColormap("zmapx"))
                 count = len(kwargs["labels"])
                 vmin, vmax = -0.5, count - 0.5
             else:
                 value = sweep["products"][symbol]
-                cmap = kwargs.get("cmap", blib.matplotlibColormap("zmapx"))
+                cmap = kwargs.get("cmap", blib.colormap.matplotlibColormap("zmapx"))
                 vmin = kwargs.get("vmin", np.min(value.flatten()))
                 vmax = kwargs.get("vmax", np.max(value.flatten()))
             self.ms[k] = ax.pcolormesh(xx, yy, value, cmap=cmap, vmin=vmin, vmax=vmax, **props)

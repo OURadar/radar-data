@@ -1,6 +1,8 @@
-blib-py
+blib-py>=1.6
+lxml
 multiprocess
 netCDF4
 numpy
+pandas
 pyyaml
 setproctitle
