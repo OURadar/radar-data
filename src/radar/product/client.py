@@ -5,6 +5,8 @@ import socket
 import logging
 import threading
 
+from functools import lru_cache
+
 from .share import *
 from ..cosmetics import colorize, pretty_object_name
 
@@ -103,7 +105,9 @@ class Client(Manager):
             for sock in self.sockets:
                 sock.close()
 
-    def get(self, path, tarinfo=None, want_tarinfo=False):
+    @lru_cache(maxsize=32)
+    def cached_get(self, path, tarinfo={}, want_tarinfo=False):
+        tarinfo = dict(tarinfo)
         if self.sockets == []:
             logger.info(f"{self.name} Not connected")
             if want_tarinfo:
@@ -135,6 +139,9 @@ class Client(Manager):
         if want_tarinfo:
             return data, new_tarinfo
         return data
+
+    def get(self, path, tarinfo: dict = {}, want_tarinfo=False):
+        return self.cached_get(path, tuple(sorted(tarinfo.items())), want_tarinfo)
 
     def stats(self):
         if self.sockets == []:
