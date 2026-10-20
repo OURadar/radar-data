@@ -1,11 +1,10 @@
-__version__ = "1.6"
+__version__ = "1.7"
 
 import importlib
 
 from typing import TYPE_CHECKING
 
 from .common import *
-
 
 _sub_ = ["chart", "cosmetics", "product"]
 _misc_ = ["print", "FIFOBuffer"]
@@ -19,8 +18,10 @@ if TYPE_CHECKING:
     from .cosmetics import dict_print as print
     from . import chart, cosmetics, product
 
+
 def __dir__():
-    return sorted(list(globals().keys()) + _sub_ + _read_ + _write_ +_misc_)
+    return sorted(list(globals().keys()) + _sub_ + _read_ + _write_ + _misc_)
+
 
 def __getattr__(name):
     if name in _sub_:
