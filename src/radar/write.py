@@ -139,6 +139,7 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
             "D": "log_differential_reflectivity_hv",
             "P": "differential_phase_hv",
             "R": "cross_correlation_ratio_hv",
+            "K": "specific_differential_phase_hv",
         }
         long_names = {
             "Z": "reflectivity",
@@ -147,8 +148,9 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
             "D": "differential_reflectivity",
             "P": "differential_phase",
             "R": "cross_correlation_ratio",
+            "K": "specific_differential_phase",
         }
-        units = {"Z": "dBZ", "V": "m/s", "W": "m/s", "D": "dB", "P": "degrees", "R": "unitless"}
+        units = {"Z": "dBZ", "V": "m/s", "W": "m/s", "D": "dB", "P": "degrees", "R": "unitless", "K": "deg/km"}
         scale_factors = {
             "Z": np.single(0.01),
             "V": np.single(0.01),
@@ -156,6 +158,7 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
             "D": np.single(0.01),
             "P": np.single(0.01),
             "R": np.single(0.001),
+            "K": np.single(0.01),
         }
         var = ncid.createVariable(name, "i2", ("time", "range"), fill_value=-32768)
         var.standard_name = standard_names[symbol]
@@ -177,6 +180,8 @@ def _write_cf1(ncid, sweep, string_length=32, period=20.0):
     _define_and_set_data("D", "ZDR")
     _define_and_set_data("P", "PHIDP")
     _define_and_set_data("R", "RHOHV")
+    if "K" in sweep["products"]:
+        _define_and_set_data("K", "KDP")
 
     r_calib_dbz_correction = ncid.createVariable("r_calib_dbz_correction", "f4", ("r_calib",))
     r_calib_dbz_correction.long_name = "calibrated_radar_dbz_correction"
