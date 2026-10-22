@@ -119,9 +119,9 @@ def _read_cf1_from_ncid(ncid, symbols=["Z", "V", "W", "D", "P", "R"]):
         timestamp = datetime.datetime.fromisoformat(timeString).replace(tzinfo=utc).timestamp()
     except Exception as e:
         raise ValueError(f"Unexpected timeString = {timeString}   e = {e}")
+    variables = ncid.variables
     sweepElevation = 0.0
     sweepAzimuth = 0.0
-    variables = ncid.variables
     elevations = np.array(variables["elevation"][:], dtype=np.float32)
     azimuths = np.array(variables["azimuth"][:], dtype=np.float32)
     mode = b"".join(variables["sweep_mode"][:]).decode("utf-8", errors="ignore").rstrip(" \x00")
